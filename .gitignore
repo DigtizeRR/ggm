@@ -1,0 +1,13 @@
+# Local editor/deployment credentials.
+.vscode/
+
+# Generated distribution packages and runtime artifacts.
+*.zip
+*.log
+cache/
+node_modules/
+vendor/
+
+# Local environment overrides.
+.env
+.env.*

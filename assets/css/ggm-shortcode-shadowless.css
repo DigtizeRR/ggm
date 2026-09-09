@@ -1,0 +1,43 @@
+/*
+ * Final cascade guard for every front-end GGM shortcode.
+ *
+ * This file intentionally loads after the feature stylesheets. The
+ * !important resets prevent theme, Elementor, cached legacy GGM rules, and
+ * hover/focus states from restoring decorative shadows.
+ */
+
+
+
+html body :is([class^="ggm-"], [class*=" ggm-"]) :is(a[href], button, input:not([type="hidden"]), select, textarea, summary, [tabindex]):focus-visible,
+html body :is([class^="ggm-"], [class*=" ggm-"]):is(a[href], button, input:not([type="hidden"]), select, textarea, summary, [tabindex]):focus-visible {
+    outline: 0px solid #0f766e !important;
+    outline-offset: 0px;
+}
+
+#ggm-login-wrap :is(a[href], button, input:not([type="hidden"]), select, textarea, [tabindex]):focus-visible,
+#ggm-signup-wrap :is(a[href], button, input:not([type="hidden"]), select, textarea, [tabindex]):focus-visible {
+	outline-color: #4f46e5 !important;
+}
+
+#ggm-dash :is(a[href], button, input:not([type="hidden"]), select, textarea, [tabindex]):focus-visible {
+	outline-color: #08734f !important;
+}
+
+.ggm-ws-faq__question:focus-visible {
+    outline: 0px solid #0f766e !important;
+    outline-offset: 0;
+}
+
+.ggm-built-form :is(a[href], button, input:not([type="hidden"]), select, textarea, [tabindex]):focus-visible {
+	outline: 3px solid #4338ca !important;
+	outline-offset: 2px;
+}
+
+.ggm-contribution-option:has(input:checked) {
+	outline: 2px solid #4658f6 !important;
+	outline-offset: 0;
+}
+
+#ggm-dash .ggm-course-lesson.is-active {
+	border-inline-start: 4px solid var(--ggm-dash-primary, #0e9e6e);
+}

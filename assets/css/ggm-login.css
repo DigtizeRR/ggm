@@ -1,0 +1,318 @@
+/*
+ * GGM — Login / Auth Page Styles
+ * Matches templates/auth/login.php, otp-verify.php, complete-profile.php
+ * Outer wrapper: #ggm-login-wrap   Steps: #ggm-login-step-1/2/3
+ */
+
+/* ── Reset / Container ─────────────────────────────────────────────────── */
+.ggm-login-container {
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	padding: 60px 20px 80px;
+	min-height: 80vh;
+	font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+	box-sizing: border-box;
+	background: var(--ggm-login-page-bg, transparent);
+}
+
+#ggm-login-wrap,
+#ggm-signup-wrap {
+	width: 100%;
+	max-width: 520px;
+	margin: 0 auto;
+}
+
+/* ── Step Panels ────────────────────────────────────────────────────────── */
+.ggm-login-step-panel {
+	background: var(--ggm-login-card-bg, #ffffff);
+	border: 1px solid #e2e8f0;
+	border-radius: 20px;
+	padding: 48px 44px 52px;
+	width: 100%;
+	box-sizing: border-box;
+	text-align: center;
+}
+
+.ggm-login-step-panel h2 {
+	font-size: 26px;
+	font-weight: 700;
+	color: var(--ggm-login-heading, #0f172a);
+	margin: 0 0 8px;
+	line-height: 1.3;
+}
+
+.ggm-login-step-panel > p,
+#ggm-otp-login-view > p,
+#ggm-password-login-view > p,
+#ggm-forgot-password-view > h2 + #ggm-fp-request-stage > p {
+	font-size: 14px;
+	color: #64748b;
+	margin: 0 0 28px;
+	line-height: 1.6;
+}
+
+/* ── Logo ───────────────────────────────────────────────────────────────── */
+.ggm-login-logo {
+	text-align: center;
+	margin-bottom: 24px;
+}
+
+.ggm-login-logo img {
+	max-height: 64px;
+	max-width: 200px;
+	object-fit: contain;
+}
+
+/* ── Account Not Found ─────────────────────────────────────────────────── */
+.ggm-account-not-found {
+	background: #fef2f2;
+	border: 1px solid #fca5a5;
+	border-radius: 8px;
+	padding: 14px 16px;
+	margin-top: 4px;
+	text-align: center;
+}
+
+.ggm-account-not-found p {
+	margin: 0 0 12px;
+	font-size: 13px;
+	color: #991b1b;
+	line-height: 1.5;
+}
+
+/* ── Inputs ─────────────────────────────────────────────────────────────── */
+.ggm-login-field-group {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+}
+
+.ggm-login-step-panel input[type="text"],
+.ggm-login-step-panel input[type="email"],
+.ggm-login-step-panel input[type="tel"],
+.ggm-login-step-panel input[type="password"] {
+	width: 100%;
+	padding: 13px 16px;
+	border: 1.5px solid #cbd5e1;
+	border-radius: 10px;
+	font-size: 15px;
+	color: var(--ggm-login-heading, #0f172a);
+	background: #f8fafc;
+	box-sizing: border-box;
+	transition: border-color .15s;
+	font-family: inherit;
+}
+
+.ggm-login-step-panel input:focus {
+	border-color: var(--ggm-login-primary, #6366f1);
+	background: #fff;
+}
+
+.ggm-auth-identifier-control.is-email-mode > .ggm-shared-country-picker {
+	display: none;
+}
+
+/* ── Buttons ─────────────────────────────────────────────────────────────── */
+.ggm-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 6px;
+	border: none;
+	border-radius: 10px;
+	cursor: pointer;
+	font-size: 15px;
+	font-weight: 600;
+	padding: 12px 24px;
+	text-decoration: none;
+	transition: background .18s, opacity .18s, transform .1s;
+	font-family: inherit;
+	line-height: 1;
+}
+
+.ggm-btn:active { transform: scale(.97); }
+
+.ggm-btn-primary {
+	background: var(--ggm-login-primary, #6366f1);
+	color: #fff;
+}
+
+.ggm-btn-primary:hover { background: var(--ggm-login-primary-hover, #4f46e5); color: #fff; }
+
+.ggm-btn-secondary {
+	background: #e8f0fe;
+	color: #3730a3;
+}
+
+.ggm-btn-secondary:hover { background: #c7d7fc; }
+.ggm-btn-secondary:disabled { opacity: .45; cursor: not-allowed; }
+
+.ggm-btn-wide { width: 100%; }
+
+.ggm-btn-link {
+	background: none;
+	border: none;
+	color: var(--ggm-login-primary, #6366f1);
+	font-size: 13px;
+	cursor: pointer;
+	padding: 0;
+	text-decoration: underline;
+	font-family: inherit;
+}
+
+/* ── Divider ────────────────────────────────────────────────────────────── */
+.ggm-login-divider {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	font-size: 12px;
+	color: #94a3b8;
+	font-weight: 600;
+	letter-spacing: 1px;
+	margin: 8px 0;
+	text-align: center;
+}
+
+.ggm-login-divider::before,
+.ggm-login-divider::after {
+	content: '';
+	flex: 1;
+	height: 1px;
+	background: #e2e8f0;
+}
+
+/* ── Error message ──────────────────────────────────────────────────────── */
+.ggm-error {
+	background: #fff1f2;
+	border: 1px solid #fecdd3;
+	border-radius: 8px;
+	color: #be123c;
+	font-size: 13px;
+	padding: 10px 14px;
+	line-height: 1.4;
+}
+
+/* ── OTP digit row ──────────────────────────────────────────────────────── */
+.ggm-otp-inputs-row {
+	display: flex;
+	gap: 10px;
+	justify-content: center;
+	margin: 8px 0 20px;
+}
+
+.ggm-otp-digit {
+	width: 48px !important;
+	height: 56px;
+	padding: 0 !important;
+	text-align: center;
+	font-size: 22px !important;
+	font-weight: 700;
+	border-radius: 10px !important;
+	flex-shrink: 0;
+}
+
+/* ── OTP step subtext ───────────────────────────────────────────────────── */
+#ggm-otp-sent-to,
+#ggm-fp-otp-sent-to {
+	font-size: 13px;
+	color: #64748b;
+	margin: 0 0 16px;
+}
+
+/* ── OTP actions ────────────────────────────────────────────────────────── */
+.ggm-otp-actions-wrap {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 10px;
+}
+
+/* ── Password form ──────────────────────────────────────────────────────── */
+.ggm-password-form-wrap {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	margin-top: 12px;
+	padding: 16px;
+	background: #f8fafc;
+	border-radius: 10px;
+	border: 1px solid #e2e8f0;
+}
+
+/* ── Profile fields ─────────────────────────────────────────────────────── */
+.ggm-profile-fields-wrap {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+}
+
+/* ── Responsive ─────────────────────────────────────────────────────────── */
+@media (max-width: 600px) {
+	#ggm-login-wrap,
+	#ggm-signup-wrap {
+		max-width: 100%;
+	}
+
+	.ggm-login-step-panel {
+		padding: 32px 24px 36px;
+		border-radius: 16px;
+	}
+}
+
+@media (max-width: 480px) {
+	.ggm-login-step-panel {
+		padding: 28px 18px 32px;
+		border-radius: 12px;
+	}
+
+	.ggm-otp-digit {
+		width: 40px !important;
+		height: 48px;
+		font-size: 18px !important;
+	}
+
+	.ggm-otp-inputs-row { gap: 6px; }
+}
+
+/* ── Shadow-free login/signup shortcode output ─────────────────────────── */
+#ggm-login-wrap,
+#ggm-login-wrap *,
+#ggm-login-wrap *::before,
+#ggm-login-wrap *::after,
+#ggm-signup-wrap,
+#ggm-signup-wrap *,
+#ggm-signup-wrap *::before,
+#ggm-signup-wrap *::after,
+.ggm-login-step-panel,
+.ggm-login-step-panel *,
+.ggm-login-step-panel *::before,
+.ggm-login-step-panel *::after {
+	box-shadow: none !important;
+	text-shadow: none !important;
+}
+
+#ggm-login-wrap,
+#ggm-signup-wrap,
+.ggm-login-step-panel,
+.elementor-widget-shortcode:has(#ggm-login-wrap),
+.elementor-widget-shortcode:has(#ggm-login-wrap) > .elementor-widget-container,
+.elementor-widget-shortcode:has(#ggm-signup-wrap),
+.elementor-widget-shortcode:has(#ggm-signup-wrap) > .elementor-widget-container {
+	filter: none !important;
+}
+
+.elementor-widget-shortcode:has(#ggm-login-wrap),
+.elementor-widget-shortcode:has(#ggm-login-wrap) > .elementor-widget-container,
+.elementor-widget-shortcode:has(#ggm-signup-wrap),
+.elementor-widget-shortcode:has(#ggm-signup-wrap) > .elementor-widget-container {
+	box-shadow: none !important;
+	text-shadow: none !important;
+}
+
+#ggm-login-wrap :is(a[href], button, input:not([type="hidden"]), select, textarea, [tabindex]):focus-visible,
+#ggm-signup-wrap :is(a[href], button, input:not([type="hidden"]), select, textarea, [tabindex]):focus-visible,
+.ggm-login-step-panel :is(a[href], button, input:not([type="hidden"]), select, textarea, [tabindex]):focus-visible {
+	outline: 3px solid #4f46e5 !important;
+	outline-offset: 2px;
+}
