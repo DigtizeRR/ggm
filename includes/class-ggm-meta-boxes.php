@@ -82,6 +82,9 @@ class GGM_Meta_Boxes {
 			wp_enqueue_style( 'wp-color-picker' );
 			wp_enqueue_script( 'wp-color-picker' );
 		}
+		if ( 'ggm_mentor' === $post_type && function_exists( 'wp_enqueue_editor' ) ) {
+			wp_enqueue_editor();
+		}
 		if ( 'course' === $post_type ) {
 			wp_enqueue_script( 'jquery-ui-sortable' );
 		}
@@ -194,6 +197,7 @@ class GGM_Meta_Boxes {
 		$duration            = get_post_meta( $post->ID, 'duration', true );
 		$is_free             = get_post_meta( $post->ID, 'is_free', true );
 		$featured_video_url  = get_post_meta( $post->ID, 'ggm_workshop_featured_video_url', true );
+		$bottom_image_id     = absint( get_post_meta( $post->ID, 'ggm_workshop_bottom_image_id', true ) );
 		$booking_card_cta_text = get_post_meta( $post->ID, 'ggm_workshop_booking_card_cta_text', true );
 		$booking_card_cta_heading = get_post_meta( $post->ID, 'ggm_workshop_booking_card_cta_heading', true );
 		$header_pill_text = get_post_meta( $post->ID, 'ggm_workshop_header_pill_text', true );
@@ -486,6 +490,13 @@ class GGM_Meta_Boxes {
 					<th><label><?php esc_html_e( 'Featured Image', 'ggm-member-dashboard' ); ?></label></th>
 					<td>
 						<p class="description"><?php esc_html_e( 'Use the "Featured Image" panel in the sidebar of this edit screen — it\'s used everywhere a workshop thumbnail is shown (dashboard, archive, single page).', 'ggm-member-dashboard' ); ?></p>
+					</td>
+				</tr>
+				<tr>
+					<th><label for="ggm-workshop-bottom-image"><?php esc_html_e( 'Bottom Image', 'ggm-member-dashboard' ); ?></label></th>
+					<td>
+						<?php $this->render_attachment_image_control( 'ggm_workshop_bottom_image_id', 'ggm-workshop-bottom-image', $bottom_image_id ); ?>
+						<p class="description"><?php esc_html_e( 'Select this image in Elementor with Dynamic Tags → GGM Workshop → Bottom Image.', 'ggm-member-dashboard' ); ?></p>
 					</td>
 				</tr>
 			</table>
@@ -1586,10 +1597,22 @@ class GGM_Meta_Boxes {
 					</td>
 				</tr>
 				<tr>
-					<th><label for="ggm-mentor-bio"><?php esc_html_e( 'Bio', 'ggm-member-dashboard' ); ?></label></th>
+					<th><label for="ggm_mentor_bio_editor"><?php esc_html_e( 'Bio', 'ggm-member-dashboard' ); ?></label></th>
 					<td>
-						<textarea name="ggm_mentor_bio" id="ggm-mentor-bio" class="large-text" rows="5"><?php echo esc_textarea( $mentor_bio ); ?></textarea>
-						<p class="description"><?php esc_html_e( 'You can use basic HTML, e.g. <strong>bold</strong>, for emphasis.', 'ggm-member-dashboard' ); ?></p>
+						<?php
+						wp_editor(
+							$mentor_bio,
+							'ggm_mentor_bio_editor',
+							array(
+								'textarea_name' => 'ggm_mentor_bio',
+								'textarea_rows' => 10,
+								'media_buttons' => false,
+								'teeny'         => false,
+								'quicktags'     => true,
+							)
+						);
+						?>
+						<p class="description"><?php esc_html_e( 'Use the Visual editor to format paragraphs, headings, links, lists, quotes, bold, and italic text. The Text tab is available for supported HTML.', 'ggm-member-dashboard' ); ?></p>
 					</td>
 				</tr>
 			</table>
@@ -1874,6 +1897,15 @@ class GGM_Meta_Boxes {
 				'ggm_workshop_featured_video_url',
 				ggm_sanitize_youtube_url( wp_unslash( $_POST['ggm_workshop_featured_video_url'] ) )
 			);
+		}
+
+		if ( array_key_exists( 'ggm_workshop_bottom_image_id', $_POST ) ) {
+			$bottom_image_id = absint( wp_unslash( $_POST['ggm_workshop_bottom_image_id'] ) );
+			if ( 0 === $bottom_image_id ) {
+				delete_post_meta( $post_id, 'ggm_workshop_bottom_image_id' );
+			} elseif ( wp_attachment_is_image( $bottom_image_id ) ) {
+				update_post_meta( $post_id, 'ggm_workshop_bottom_image_id', $bottom_image_id );
+			}
 		}
 
 		if ( isset( $_POST['ggm_workshop_booking_card_hero_header'] ) ) {
@@ -2173,6 +2205,37 @@ class GGM_Meta_Boxes {
 	}
 
 	/**
+	 * Render an attachment-ID image selector for a standalone workshop field.
+	 *
+	 * Keeping the attachment ID allows Elementor to retain WordPress image
+	 * metadata and responsive sizes instead of treating the image as a bare URL.
+	 *
+	 * @param string $name          Form field name.
+	 * @param string $id            Unique input ID used by the media buttons.
+	 * @param int    $attachment_id Current image attachment ID.
+	 */
+	private function render_attachment_image_control( $name, $id, $attachment_id = 0 ) {
+		$attachment_id = absint( $attachment_id );
+		if ( $attachment_id && ! wp_attachment_is_image( $attachment_id ) ) {
+			$attachment_id = 0;
+		}
+		$preview_url = $attachment_id ? wp_get_attachment_image_url( $attachment_id, 'thumbnail' ) : '';
+		?>
+		<div class="ggm-repeater-media">
+			<input type="hidden" name="<?php echo esc_attr( $name ); ?>" value="<?php echo esc_attr( $attachment_id ); ?>" class="ggm-media-id" id="<?php echo esc_attr( $id ); ?>" data-preview-url="<?php echo esc_url( $preview_url ); ?>">
+			<div class="ggm-repeater-media__preview">
+				<img src="<?php echo esc_url( $preview_url ); ?>" alt=""<?php echo $preview_url ? '' : ' hidden'; ?>>
+				<span<?php echo $preview_url ? ' hidden' : ''; ?>><?php esc_html_e( 'No image', 'ggm-member-dashboard' ); ?></span>
+			</div>
+			<div class="ggm-repeater-media__actions">
+				<button type="button" class="button ggm-media-upload-btn" data-target="<?php echo esc_attr( $id ); ?>" data-value-type="id" data-media-type="image"><?php esc_html_e( 'Select / Replace Image', 'ggm-member-dashboard' ); ?></button>
+				<button type="button" class="button ggm-media-clear-btn" data-target="<?php echo esc_attr( $id ); ?>"<?php echo $attachment_id ? '' : ' disabled'; ?>><?php esc_html_e( 'Remove Image', 'ggm-member-dashboard' ); ?></button>
+			</div>
+		</div>
+		<?php
+	}
+
+	/**
 	 * Render a compact image selector for workshop repeater rows.
 	 *
 	 * The URL remains a submitted hidden field so storage and front-end output
@@ -2212,15 +2275,18 @@ class GGM_Meta_Boxes {
 		?>
 		<script>
 		jQuery(document).ready(function($) {
-			function syncRepeaterMediaPreview(targetInput) {
+			function syncRepeaterMediaPreview(targetInput, selectedPreviewUrl) {
 				var control = targetInput.closest('.ggm-repeater-media');
 				if (!control.length) return;
-				var url = $.trim(targetInput.val() || '');
+				var isAttachmentId = targetInput.hasClass('ggm-media-id');
+				var url = typeof selectedPreviewUrl === 'string'
+					? selectedPreviewUrl
+					: $.trim(isAttachmentId ? (targetInput.attr('data-preview-url') || '') : (targetInput.val() || ''));
 				var image = control.find('.ggm-repeater-media__preview img');
 				var empty = control.find('.ggm-repeater-media__preview span');
 				var clear = control.find('.ggm-media-clear-btn');
 
-				if (url) {
+				if ($.trim(targetInput.val() || '') && url) {
 					image.attr('src', url).prop('hidden', false);
 					empty.prop('hidden', true);
 					clear.prop('disabled', false);
@@ -2234,6 +2300,9 @@ class GGM_Meta_Boxes {
 			$('.ggm-repeater-media .ggm-media-url').each(function() {
 				syncRepeaterMediaPreview($(this));
 			});
+			$('.ggm-repeater-media .ggm-media-id').each(function() {
+				syncRepeaterMediaPreview($(this));
+			});
 
 			$(document).on('error', '.ggm-repeater-media__preview img', function() {
 				$(this).prop('hidden', true).siblings('span').prop('hidden', false);
@@ -2244,17 +2313,27 @@ class GGM_Meta_Boxes {
 				var button = $(this);
 				var targetId = button.data('target');
 				var targetInput = $('#' + targetId);
+				var mediaType = button.data('media-type');
 
 				var file_frame = wp.media.frames.file_frame = wp.media({
 					title: 'Select File',
 					button: { text: 'Use File' },
-					multiple: false
+					multiple: false,
+					library: mediaType ? { type: mediaType } : undefined
 				});
 
 				file_frame.on('select', function() {
 					var attachment = file_frame.state().get('selection').first().toJSON();
-					targetInput.val(attachment.url).trigger('change');
-					syncRepeaterMediaPreview(targetInput);
+					var previewUrl = attachment.sizes && attachment.sizes.thumbnail
+						? attachment.sizes.thumbnail.url
+						: attachment.url;
+					if ('id' === button.data('value-type')) {
+						targetInput.val(attachment.id).attr('data-preview-url', previewUrl).trigger('change');
+						syncRepeaterMediaPreview(targetInput, previewUrl);
+					} else {
+						targetInput.val(attachment.url).trigger('change');
+						syncRepeaterMediaPreview(targetInput);
+					}
 				});
 
 				file_frame.open();
@@ -2264,7 +2343,7 @@ class GGM_Meta_Boxes {
 				e.preventDefault();
 				var targetId = $(this).data('target');
 				var targetInput = $('#' + targetId);
-				targetInput.val('').trigger('change');
+				targetInput.val('').attr('data-preview-url', '').trigger('change');
 				syncRepeaterMediaPreview(targetInput);
 			});
 		});

@@ -51,8 +51,7 @@ class GGM_Dashboard {
 			: ggm_get_setting( 'ggm_currency', 'INR' );
 
 		// ─── 1. Profile ──────────────────────────────────────────────────────
-		$phone = get_user_meta( $user_id, 'billing_phone', true )
-			  ?: get_user_meta( $user_id, 'ggm_phone', true );
+		$phone = ggm_get_member_phone( $user_id );
 		$whatsapp_country_code = get_user_meta( $user_id, 'ggm_whatsapp_country_code', true ) ?: '+91';
 
 		$login_page_id = (int) ggm_get_setting( 'ggm_login_page_id', 0 );
@@ -327,9 +326,13 @@ class GGM_Dashboard {
 		$last_name    = sanitize_text_field( wp_unslash( $_POST['last_name'] ?? '' ) );
 		$phone        = sanitize_text_field( wp_unslash( $_POST['phone'] ?? '' ) );
 		$country_code = sanitize_text_field( wp_unslash( $_POST['country_code'] ?? '' ) );
+		$clean_phone  = '' !== $phone ? ggm_normalize_member_phone( $phone, $country_code ?: '+91' ) : '';
 
 		if ( empty( $first_name ) ) {
 			wp_send_json_error( array( 'message' => __( 'First name is required.', 'ggm-member-dashboard' ) ) );
+		}
+		if ( '' !== $phone && '' === $clean_phone ) {
+			wp_send_json_error( array( 'message' => __( 'Please enter a valid phone number for the selected country.', 'ggm-member-dashboard' ) ) );
 		}
 
 		wp_update_user( array(
@@ -343,7 +346,6 @@ class GGM_Dashboard {
 		update_user_meta( $user_id, 'billing_last_name', $last_name );
 
 		if ( ! empty( $phone ) ) {
-			$clean_phone = preg_replace( '/\D/', '', $phone );
 			update_user_meta( $user_id, 'billing_phone', $clean_phone );
 			update_user_meta( $user_id, 'ggm_phone', $clean_phone );
 		}

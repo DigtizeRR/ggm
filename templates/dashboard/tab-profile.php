@@ -32,7 +32,7 @@ foreach ( $country_codes as $country ) {
 	if ( $country_code === $country['dial'] ) { $selected_country = $country; break; }
 }
 if ( ! $selected_country ) {
-	$selected_country = array( 'iso'=>'IN', 'dial'=>'+91', 'name'=>'India', 'flag'=>'https://flagcdn.com/24x18/in.png' );
+	$selected_country = array( 'iso'=>'IN', 'dial'=>'+91', 'name'=>'India' );
 }
 ?>
 <div class="ggm-profile-wrap">
@@ -86,15 +86,15 @@ if ( ! $selected_country ) {
 					<div class="ggm-profile-phone-control">
 						<div class="ggm-profile-country-picker">
 							<input type="hidden" id="ggm_country_code" name="country_code" data-country-value value="<?php echo esc_attr( $selected_country['dial'] ); ?>">
-							<button type="button" class="ggm-profile-country-toggle" aria-haspopup="listbox" aria-expanded="false"><img src="<?php echo esc_url( $selected_country['flag'] ); ?>" alt=""><span><?php echo esc_html( $selected_country['dial'] ); ?></span></button>
+							<button type="button" class="ggm-profile-country-toggle" aria-haspopup="listbox" aria-expanded="false"><?php echo class_exists( 'GGM_Form_Builder' ) ? GGM_Form_Builder::country_flag_svg( $selected_country['iso'] ) : ''; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- generated from a validated ISO code. ?><span><?php echo esc_html( $selected_country['dial'] ); ?></span></button>
 							<div class="ggm-profile-country-menu" role="listbox">
 								<input type="search" class="ggm-profile-country-search" placeholder="<?php esc_attr_e( 'Search country or code', 'ggm-member-dashboard' ); ?>" aria-label="<?php esc_attr_e( 'Search countries', 'ggm-member-dashboard' ); ?>">
 								<?php foreach ( $country_codes as $country ) : $search_text = strtolower( $country['name'] . ' ' . $country['iso'] . ' ' . $country['dial'] ); ?>
-									<button type="button" class="ggm-profile-country-option" role="option" data-code="<?php echo esc_attr( $country['dial'] ); ?>" data-flag="<?php echo esc_url( $country['flag'] ); ?>" data-search="<?php echo esc_attr( $search_text ); ?>" aria-selected="<?php echo $country['dial'] === $selected_country['dial'] ? 'true' : 'false'; ?>"><img src="<?php echo esc_url( $country['flag'] ); ?>" alt="" loading="lazy"><span><?php echo esc_html( $country['name'] . ' ' . $country['dial'] ); ?></span></button>
+									<button type="button" class="ggm-profile-country-option" role="option" data-code="<?php echo esc_attr( $country['dial'] ); ?>" data-iso="<?php echo esc_attr( strtolower( $country['iso'] ) ); ?>" data-search="<?php echo esc_attr( $search_text ); ?>" aria-selected="<?php echo $country['dial'] === $selected_country['dial'] ? 'true' : 'false'; ?>"><?php echo GGM_Form_Builder::country_flag_svg( $country['iso'] ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- generated from a validated ISO code. ?><span><?php echo esc_html( $country['name'] . ' ' . $country['dial'] ); ?></span></button>
 								<?php endforeach; ?>
 							</div>
 						</div>
-						<input type="tel" id="ggm_phone" name="phone" value="<?php echo esc_attr( $phone ); ?>" class="ggm-input" placeholder="<?php esc_attr_e( 'WhatsApp number', 'ggm-member-dashboard' ); ?>" inputmode="tel" autocomplete="tel-national">
+						<input type="tel" id="ggm_phone" name="phone" value="<?php echo esc_attr( $phone ); ?>" class="ggm-input" placeholder="<?php esc_attr_e( 'WhatsApp number', 'ggm-member-dashboard' ); ?>" inputmode="tel" autocomplete="tel-national" maxlength="15">
 					</div>
 				</div>
 			</div>

@@ -46,23 +46,6 @@ $is_contribution      = false;
 $contribution_snapshot = null;
 $contribution_error    = '';
 
-// Common country codes for the WhatsApp Number selector (Task 10) —
-// defaults to India. This is a lightweight, self-contained list rather
-// than pulling in a third-party JS library, so checkout never depends on
-// an external CDN being reachable.
-$country_codes = array(
-	'+91'  => '🇮🇳 +91',
-	'+1'   => '🇺🇸 +1',
-	'+44'  => '🇬🇧 +44',
-	'+971' => '🇦🇪 +971',
-	'+966' => '🇸🇦 +966',
-	'+61'  => '🇦🇺 +61',
-	'+65'  => '🇸🇬 +65',
-	'+49'  => '🇩🇪 +49',
-	'+33'  => '🇫🇷 +33',
-	'+64'  => '🇳🇿 +64',
-);
-
 if ( ! empty( $workshop ) ) {
 	$type           = 'workshop';
 	$item_id        = $workshop->ID;
@@ -178,7 +161,7 @@ $contact_phone = $prefill_phone;
 				<label for="ggm-checkout-phone"><?php esc_html_e( 'WhatsApp Number', 'ggm-member-dashboard' ); ?></label>
 					<div class="ggm-global-phone-control">
 						<?php echo class_exists( 'GGM_Form_Builder' ) ? GGM_Form_Builder::country_picker_html( '', 'ggm-checkout-country-code', $prefill_country ) : '<input type="hidden" id="ggm-checkout-country-code" value="+91">'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
-						<input type="tel" id="ggm-checkout-phone" value="<?php echo esc_attr( $contact_phone ); ?>" placeholder="<?php esc_attr_e( 'Your WhatsApp number', 'ggm-member-dashboard' ); ?>" inputmode="tel" autocomplete="tel-national" required>
+						<input type="tel" id="ggm-checkout-phone" value="<?php echo esc_attr( $contact_phone ); ?>" placeholder="<?php esc_attr_e( 'Your WhatsApp number', 'ggm-member-dashboard' ); ?>" inputmode="tel" autocomplete="tel-national" maxlength="15" required>
 					</div>
 			</div>
 			<div class="ggm-checkout-field">

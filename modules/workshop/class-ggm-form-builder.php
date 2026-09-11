@@ -27,6 +27,8 @@ class GGM_Form_Builder {
 		$loader->add_action( 'wp_ajax_nopriv_ggm_update_builder_form_after_submit', $this, 'update_after_submit_fields' );
 		$loader->add_action( 'wp_ajax_ggm_create_form_payment', $this, 'create_form_payment' );
 		$loader->add_action( 'wp_ajax_nopriv_ggm_create_form_payment', $this, 'create_form_payment' );
+		$loader->add_action( 'wp_ajax_ggm_refresh_form_payment_nonce', $this, 'refresh_form_payment_nonce' );
+		$loader->add_action( 'wp_ajax_nopriv_ggm_refresh_form_payment_nonce', $this, 'refresh_form_payment_nonce' );
 		$loader->add_action( 'wp_ajax_ggm_verify_form_payment', $this, 'verify_form_payment' );
 		$loader->add_action( 'wp_ajax_nopriv_ggm_verify_form_payment', $this, 'verify_form_payment' );
 		$loader->add_action( 'wp_ajax_ggm_render_popup_form', $this, 'ajax_render_popup_form' );
@@ -378,7 +380,6 @@ class GGM_Form_Builder {
 				'iso'  => $iso,
 				'dial' => $dial,
 				'name' => self::country_display_name( $iso ),
-				'flag' => self::country_flag_url( $iso ),
 			);
 		}
 		usort( $countries, static function( $a, $b ) {
@@ -410,21 +411,21 @@ class GGM_Form_Builder {
 				if ( 'IN' === $country['iso'] ) { $selected = $country; break; }
 			}
 		}
-		$selected = $selected ?: array( 'iso'=>'IN', 'name'=>'India', 'dial'=>'+91', 'flag'=>'' );
+		$selected = $selected ?: array( 'iso'=>'IN', 'name'=>'India', 'dial'=>'+91' );
 
 		ob_start();
 		?>
 		<div class="ggm-country-picker ggm-shared-country-picker <?php echo esc_attr( $extra_class ); ?>" data-country-picker>
 			<input type="hidden" id="<?php echo esc_attr( $id ); ?>" name="<?php echo esc_attr( $name ); ?>" value="<?php echo esc_attr( $selected['dial'] ); ?>">
 			<button type="button" class="ggm-country-picker-button" aria-haspopup="listbox" aria-expanded="false">
-				<img class="ggm-country-flag" src="<?php echo esc_url( $selected['flag'] ); ?>" alt="">
+				<?php echo self::country_flag_svg( $selected['iso'] ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- generated from a validated ISO code. ?>
 				<span><?php echo esc_html( $selected['dial'] ); ?></span>
 			</button>
 			<div class="ggm-country-options" role="listbox">
 				<input type="search" class="ggm-country-search" placeholder="<?php esc_attr_e( 'Search country or code', 'ggm-member-dashboard' ); ?>" aria-label="<?php esc_attr_e( 'Search countries', 'ggm-member-dashboard' ); ?>">
 				<?php foreach ( $countries as $country ) : ?>
-					<button type="button" class="ggm-country-option" role="option" data-code="<?php echo esc_attr( $country['dial'] ); ?>" data-flag="<?php echo esc_url( $country['flag'] ); ?>" data-search="<?php echo esc_attr( strtolower( $country['name'] . ' ' . $country['iso'] . ' ' . $country['dial'] ) ); ?>" aria-selected="<?php echo $country['dial'] === $selected['dial'] ? 'true' : 'false'; ?>">
-						<img class="ggm-country-flag" src="<?php echo esc_url( $country['flag'] ); ?>" alt="" loading="lazy">
+					<button type="button" class="ggm-country-option" role="option" data-code="<?php echo esc_attr( $country['dial'] ); ?>" data-iso="<?php echo esc_attr( strtolower( $country['iso'] ) ); ?>" data-search="<?php echo esc_attr( strtolower( $country['name'] . ' ' . $country['iso'] . ' ' . $country['dial'] ) ); ?>" aria-selected="<?php echo $country['dial'] === $selected['dial'] ? 'true' : 'false'; ?>">
+						<?php echo self::country_flag_svg( $country['iso'] ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- generated from a validated ISO code. ?>
 						<span><?php echo esc_html( $country['name'] . ' ' . $country['dial'] ); ?></span>
 					</button>
 				<?php endforeach; ?>
@@ -444,20 +445,30 @@ class GGM_Form_Builder {
 		return $iso;
 	}
 
-	private static function country_flag( $iso ) {
-		$iso = strtoupper( preg_replace( '/[^A-Z]/', '', (string) $iso ) );
-		if ( 2 !== strlen( $iso ) ) { return ''; }
-		$out = '';
-		foreach ( str_split( $iso ) as $char ) {
-			$out .= '&#x' . dechex( 0x1F1E6 + ord( $char ) - 65 ) . ';';
-		}
-		return $out;
-	}
-
-	private static function country_flag_url( $iso ) {
+	public static function country_flag_svg( $iso ) {
 		$iso = strtolower( preg_replace( '/[^A-Za-z]/', '', (string) $iso ) );
 		if ( 2 !== strlen( $iso ) ) { return ''; }
-		return 'https://flagcdn.com/24x18/' . $iso . '.png';
+
+		// Load the bundled, trusted flag definitions once per request, then place
+		// the selected flag's real vector elements directly in the page markup.
+		// The browser therefore makes no flag image/sprite request and the picker
+		// never depends on an external <use href="..."> reference.
+		static $symbols = null;
+		if ( null === $symbols ) {
+			$symbols = array();
+			$flag_file = GGM_PLUGIN_DIR . 'assets/svg/country-flags.svg';
+			$source = is_readable( $flag_file ) ? file_get_contents( $flag_file ) : '';
+			if ( is_string( $source ) && preg_match_all( '/<symbol\b([^>]*)\bid="ggm-flag-([a-z]{2})"([^>]*)>(.*?)<\/symbol>/s', $source, $matches, PREG_SET_ORDER ) ) {
+				foreach ( $matches as $match ) {
+					$attributes = $match[1] . $match[3];
+					$view_box = preg_match( '/\bviewBox="([^"]+)"/', $attributes, $view_box_match ) ? $view_box_match[1] : '0 0 640 480';
+					$symbols[ $match[2] ] = array( 'viewBox' => $view_box, 'markup' => $match[4] );
+				}
+			}
+		}
+
+		if ( empty( $symbols[ $iso ] ) ) { return ''; }
+		return '<svg class="ggm-country-flag" viewBox="' . esc_attr( $symbols[ $iso ]['viewBox'] ) . '" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" data-country-flag="' . esc_attr( $iso ) . '" aria-hidden="true" focusable="false">' . $symbols[ $iso ]['markup'] . '</svg>';
 	}
 
 	private static function sanitize_field_width( $width ) {
@@ -503,12 +514,14 @@ class GGM_Form_Builder {
 		foreach ( (array) ( $settings['payment_options'] ?? array() ) as $option ) {
 			$id     = sanitize_key( $option['id'] ?? '' );
 			$label  = sanitize_text_field( $option['label'] ?? '' );
+			$description = sanitize_text_field( $option['description'] ?? '' );
 			$amount = round( (float) ( $option['amount'] ?? 0 ), 2 );
 			if ( ! $id || isset( $seen_ids[ $id ] ) || '' === $label || $amount <= 0 ) { continue; }
 			$seen_ids[ $id ] = true;
 			$options[] = array(
 				'id'     => $id,
 				'label'  => $label,
+				'description' => $description,
 				'amount' => $amount,
 				'width'  => self::sanitize_field_width( $option['width'] ?? '100' ),
 			);
@@ -535,6 +548,7 @@ class GGM_Form_Builder {
 		$seen_ids = array();
 		foreach ( array_slice( (array) $raw_options, 0, 20 ) as $row ) {
 			$label = sanitize_text_field( wp_unslash( $row['label'] ?? '' ) );
+			$description = sanitize_text_field( wp_unslash( $row['description'] ?? '' ) );
 			$amount = round( (float) wp_unslash( $row['amount'] ?? 0 ), 2 );
 			$id = sanitize_key( wp_unslash( $row['id'] ?? '' ) );
 			$label_key = strtolower( trim( $label ) );
@@ -550,6 +564,7 @@ class GGM_Form_Builder {
 			$options[] = array(
 				'id'     => $id,
 				'label'  => $label,
+				'description' => $description,
 				'amount' => $amount,
 				'width'  => self::sanitize_field_width( $row['width'] ?? '100' ),
 			);
@@ -565,8 +580,26 @@ class GGM_Form_Builder {
 		return null;
 	}
 
+	/** Validate legacy free-text form currency settings before display/payment. */
+	private static function payment_currency( $currency ) {
+		if ( class_exists( 'GGM_Currency' ) ) {
+			return GGM_Currency::normalize_code( $currency, GGM_Currency::base_currency() );
+		}
+
+		$currency = strtoupper( trim( sanitize_text_field( (string) $currency ) ) );
+		return preg_match( '/^[A-Z]{3}$/', $currency ) ? $currency : 'INR';
+	}
+
 	private static function format_payment_option_amount( $amount, $currency ) {
-		return strtoupper( sanitize_text_field( $currency ) ) . ' ' . number_format_i18n( (float) $amount, 2 );
+		return self::payment_currency( $currency ) . ' ' . number_format_i18n( (float) $amount, 2 );
+	}
+
+	/** Reference checkout uses the Indian currency glyph, without changing other forms' currency output. */
+	private static function format_health_checkout_amount( $amount, $currency ) {
+		$currency = self::payment_currency( $currency );
+		// Keep the screenshot's comma grouping and decimal point independent of
+		// the WordPress locale; the underlying numeric amount is unchanged.
+		return ( 'INR' === $currency ? '₹' : $currency ) . ' ' . number_format( (float) $amount, 2, '.', ',' );
 	}
 
 	/** Width for the one price-selection group, with per-price widths retained only as a migration fallback. */
@@ -660,6 +693,9 @@ class GGM_Form_Builder {
 			'allow_multiple' => ! empty( $_POST['allow_multiple'] ),
 			'allow_additional_resubmission' => ! empty( $_POST['allow_additional_resubmission'] ),
 			'allow_guests' => ! empty( $_POST['allow_guests'] ),
+			// This is deliberately opt-in per form. Existing forms retain the
+			// standard renderer unless their own settings enable this theme.
+			'health_checkout_theme' => ! empty( $_POST['health_checkout_theme'] ),
 			'whatsapp_group_url' => esc_url_raw( wp_unslash( $_POST['whatsapp_group_url'] ?? '' ) ),
 			'payment_enabled' => ! empty( $_POST['payment_enabled'] ),
 			'payment_flow' => $this->allowed_value( $_POST['payment_flow'] ?? 'submit', array( 'submit','before_form' ), 'submit' ),
@@ -671,7 +707,7 @@ class GGM_Form_Builder {
 			'payment_amount' => max( 0, round( (float) wp_unslash( $_POST['payment_amount'] ?? 0 ), 2 ) ), // Legacy fallback only.
 			'payment_options' => $payment_options,
 			'payment_options_width' => self::sanitize_field_width( $_POST['payment_options_width'] ?? '100' ),
-			'payment_currency' => strtoupper( sanitize_text_field( wp_unslash( $_POST['payment_currency'] ?? ggm_get_setting( 'ggm_currency', 'INR' ) ) ) ),
+			'payment_currency' => self::payment_currency( wp_unslash( $_POST['payment_currency'] ?? ggm_get_setting( 'ggm_currency', 'INR' ) ) ),
 			'payment_description' => sanitize_text_field( wp_unslash( $_POST['payment_description'] ?? '' ) ),
 			'payment_success' => wp_kses_post( wp_unslash( $_POST['payment_success'] ?? 'Payment received. Your response has been submitted.' ) ),
 		);
@@ -683,9 +719,6 @@ class GGM_Form_Builder {
 		if ( empty( $settings['payment_enabled'] ) ) {
 			$settings['payment_enabled'] = false;
 			$settings['payment_amount']  = 0;
-		}
-		if ( '' === $settings['payment_currency'] ) {
-			$settings['payment_currency'] = strtoupper( sanitize_text_field( ggm_get_setting( 'ggm_currency', 'INR' ) ) );
 		}
 		$now = current_time( 'mysql' );
 		if ( $form_id && self::get_form( $form_id ) ) {
@@ -1022,6 +1055,9 @@ class GGM_Form_Builder {
 		$schema = self::get_schema( $form );
 		$settings = json_decode( (string) $form->settings_json, true );
 		$settings = is_array( $settings ) ? $settings : array();
+		// The supplied design targets form 3. Existing installs therefore receive
+		// it immediately, while an explicitly saved unchecked setting can disable it.
+		$health_checkout_theme = ! empty( $settings['health_checkout_theme'] ) || ( 3 === (int) $form->id && ! array_key_exists( 'health_checkout_theme', $settings ) );
 		$allow_guests = ! empty( $settings['allow_guests'] );
 		if ( ! is_user_logged_in() && ! $allow_guests ) { return '<div class="ggm-built-form"><p>' . esc_html__( 'Please log in to complete this form.', 'ggm-member-dashboard' ) . '</p></div>'; }
 		$user_id = get_current_user_id();
@@ -1281,10 +1317,11 @@ class GGM_Form_Builder {
 					white-space: nowrap;
 				}
 				.ggm-country-flag {
+					display: block;
 					flex: 0 0 auto;
 					width: 24px;
 					height: 18px;
-					object-fit: cover;
+					overflow: hidden;
 					border: 1px solid #d0d7e2;
 					border-radius: 2px;
 					background: #fff;
@@ -1514,6 +1551,81 @@ class GGM_Form_Builder {
 				.ggm-form-payment-option:has(input:checked) { border-color: #4338ca; background: #eef2ff; }
 				.ggm-form-payment-option__label { font-weight: 600; }
 				.ggm-form-payment-option__amount { font-weight: 700; white-space: nowrap; }
+				/* The checkout reference is an intentionally isolated, per-form theme. */
+				.ggm-built-form.ggm-form-theme-health-checkout { box-sizing: border-box; width: 100%; max-width: 855px; height: auto !important; min-height: 0 !important; max-height: none; align-self: flex-start; margin: 0 auto; padding: 23px 32px 25px 37px; container-name: ggm-health-checkout; container-type: inline-size; color: #111827; font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+				.ggm-form-theme-health-checkout *,
+				.ggm-form-theme-health-checkout *::before,
+				.ggm-form-theme-health-checkout *::after { box-sizing: border-box; }
+				.ggm-form-theme-health-checkout > .ggm-form-title,
+				.ggm-form-theme-health-checkout > p { display: none; }
+				.ggm-form-theme-health-checkout .ggm-form-section-title,
+				.ggm-form-theme-health-checkout .ggm-form-page > p,
+				.ggm-form-theme-health-checkout .ggm-form-field .description { display: none; }
+				.ggm-form-theme-health-checkout .ggm-builder-public-form { height: auto !important; min-height: 0 !important; max-height: none; margin: 0; }
+				.ggm-form-theme-health-checkout .ggm-form-page { height: auto !important; min-height: 0 !important; max-height: none; grid-template-columns: minmax(0,1.043fr) minmax(0,1fr); column-gap: 30px; }
+				.ggm-form-theme-health-checkout .ggm-field-width-50 { grid-column: auto; }
+				.ggm-form-theme-health-checkout .ggm-field-width-100 { grid-column: 1 / -1; }
+				.ggm-form-theme-health-checkout .ggm-form-field { position: relative; margin: 0 0 14px; }
+				.ggm-form-theme-health-checkout .ggm-field-label strong { display: block; margin: 0 0 11px; color: #172033; font-size: 16px; font-weight: 600; line-height: 1.2; }
+				.ggm-form-theme-health-checkout .ggm-form-field > input,
+				.ggm-form-theme-health-checkout .ggm-form-field > textarea,
+				.ggm-form-theme-health-checkout .ggm-form-field > select {     width: 100%;
+    min-height: 52px;
+    padding: 13px 16px 13px 54px;
+    border: 1px solid #dfe3e8 !important;
+    border-radius: 9px !important;
+    background: #f8fafc !important;
+    color: #667085 !important;
+    font-size: 16px !important;
+    line-height: 24px !important; }
+				.ggm-form-theme-health-checkout .ggm-form-field > input:focus,
+				.ggm-form-theme-health-checkout .ggm-form-field > textarea:focus,
+				.ggm-form-theme-health-checkout .ggm-form-field > select:focus { border-color: #4e9a37; background: #fff; }
+				.ggm-form-theme-health-checkout .ggm-field-short_answer::after { content: ""; position: absolute; left: 19px; bottom: 16px; width: 18px; height: 18px; opacity: .62; background: center / contain no-repeat url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' stroke='%23475569' stroke-width='2' viewBox='0 0 24 24'%3E%3Cpath d='M20 21a8 8 0 0 0-16 0M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z'/%3E%3C/svg%3E"); pointer-events: none; }
+				.ggm-form-theme-health-checkout .ggm-field-short_answer:has(.ggm-phone-country-control)::after { display: none; }
+				.ggm-form-theme-health-checkout .ggm-field-short_answer[data-config*="email"]::after { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' stroke='%23475569' stroke-width='2' viewBox='0 0 24 24'%3E%3Crect x='3' y='5' width='18' height='14' rx='1'/%3E%3Cpath d='m3 7 9 6 9-6'/%3E%3C/svg%3E"); }
+				.ggm-form-theme-health-checkout .ggm-phone-country-control { max-width: none; min-height: 52px; border: 1px solid #dfe3e8; border-radius: 9px; background: #f8fafc; }
+				.ggm-form-theme-health-checkout .ggm-phone-country-control .ggm-country-picker-button { min-height: 50px !important; background: transparent !important; }
+				.ggm-form-theme-health-checkout .ggm-phone-country-control > input[type="tel"] {    min-height: 50px;
+    padding: 13px 16px;
+    border: 0 !important;
+    border-left: 1px solid #dfe3e8 !important;
+    border-radius: 0 9px 9px 0 !important;
+    outline: 0;
+    background: transparent !important;
+    color: #667085;
+    font-size: 16px; }
+				.ggm-form-theme-health-checkout .ggm-form-payment-options { width: 100%; max-width: 100%; margin: 1px 0 25px; }
+				.ggm-form-theme-health-checkout .ggm-form-page > .ggm-form-payment-options { grid-column: 1 / -1; }
+				.ggm-form-theme-health-checkout .ggm-form-payment-options legend { float: left; display: flex; width: 100%; flex-wrap: nowrap; align-items: center; justify-content: space-between; gap: 16px; margin: 8px 0 18px; padding: 0; color: #111827; font-size: 19px; font-weight: 800; line-height: 24px; }
+				.ggm-form-theme-health-checkout .ggm-form-payment-security { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 8px; margin-left: auto; color: #77808d; font-size: 14px; font-weight: 500; white-space: nowrap; }
+				.ggm-form-theme-health-checkout .ggm-form-payment-security::before { width: 15px; height: 17px; background: center / contain no-repeat url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%2377808d' d='M17 9h-1V7a4 4 0 0 0-8 0v2H7a2 2 0 0 0-2 2v9h14v-9a2 2 0 0 0-2-2Zm-7-2a2 2 0 1 1 4 0v2h-4V7Zm3 8.7V18h-2v-2.3a2 2 0 1 1 2 0Z'/%3E%3C/svg%3E"); content: ""; }
+				.ggm-form-theme-health-checkout .ggm-form-payment-options__choices { clear: both; width: 100%; gap: 9px; }
+				.ggm-form-theme-health-checkout .ggm-form-payment-option { grid-template-columns: 25px 58px minmax(0,1fr) auto; min-height: 77px; gap: 23px; padding: 8px 26px; border: 1px solid #e0e4e9; border-radius: 11px; background: #fff; }
+				.ggm-form-theme-health-checkout .ggm-form-payment-option input { width: 25px; height: 25px; margin: 0; accent-color: #4b9d30; }
+				.ggm-form-theme-health-checkout .ggm-form-payment-option:has(input:checked) { border: 2px solid #5d9f4d; background: linear-gradient(90deg, #fbfffa 0%, #f8fcf7 100%); }
+				.ggm-form-theme-health-checkout .ggm-form-payment-option__icon { position: relative; display: grid; width: 58px; height: 58px; place-items: center; border-radius: 999px; background: #e9f9e7; color: #3e9d38; }
+				.ggm-form-theme-health-checkout .ggm-form-payment-option__icon svg { display: block; width: 31px; height: 31px; fill: currentColor; }
+				.ggm-form-theme-health-checkout .ggm-form-payment-option:nth-child(2) .ggm-form-payment-option__icon { background: #fde8ed; color: #d8657a; }
+				.ggm-form-theme-health-checkout .ggm-form-payment-option:nth-child(3) .ggm-form-payment-option__icon { background: #fff3d3; color: #ad7900; }
+				.ggm-form-theme-health-checkout .ggm-form-payment-option:nth-child(3) .ggm-form-payment-option__icon svg { width: 35px; height: 35px; }
+				.ggm-form-theme-health-checkout .ggm-form-payment-option__details { display: flex; min-width: 0; flex-direction: column; gap: 3px; padding-left: 5px; overflow-wrap: anywhere; }
+				.ggm-form-theme-health-checkout .ggm-form-payment-option__label { min-width: 0; color: #111827; font-size: 18px; font-weight: 650; line-height: 1.2; text-transform: uppercase; overflow-wrap: anywhere; }
+				.ggm-form-theme-health-checkout .ggm-form-payment-option__description { min-width: 0; color: #707988; font-size: 15px; font-weight: 500; line-height: 1.25; overflow-wrap: anywhere; }
+				.ggm-form-theme-health-checkout .ggm-form-payment-option__amount { grid-column: 4; grid-row: 1; align-self: center; color: #10172b; font-size: 19px; font-weight: 700; white-space: nowrap; }
+				.ggm-form-theme-health-checkout .ggm-form-nav { display: block; margin-top: 0; }
+				.ggm-form-theme-health-checkout .ggm-form-pay-btn { display: flex; width: 100%; height: 55px; min-height: 55px; align-items: center; justify-content: center; margin: 0 !important; padding: 0 24px; border: 0; border-radius: 20px; background: linear-gradient(90deg, #4c9d19 0%, #31920f 100%); color: #fff; font-size: 18px; font-weight: 800; line-height: 1; }
+				.ggm-form-theme-health-checkout .ggm-form-pay-btn::after { width: 22px; height: 22px; margin-left: 18px; background: center / contain no-repeat url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' stroke='white' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' viewBox='0 0 24 24'%3E%3Cpath d='m5 12h14m-6-6 6 6-6 6'/%3E%3C/svg%3E"); content: ""; }
+				.ggm-form-theme-health-checkout .ggm-form-feedback { min-height: 0; margin: 0; overflow-wrap: anywhere; }
+				.ggm-form-theme-health-checkout .ggm-form-feedback:empty { display: none; }
+				.ggm-form-theme-health-checkout .ggm-form-feedback:not(:empty) { margin-top: 8px; }
+				.ggm-form-theme-health-checkout .ggm-form-security-note { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 8px; color: #77808d; font-size: 14px; font-weight: 500; line-height: 20px; }
+				.ggm-form-theme-health-checkout .ggm-form-security-note::before { width: 17px; height: 17px; background: center / contain no-repeat url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%234ca64a' d='m12 2 8 3v6c0 5.1-3.4 9.2-8 11-4.6-1.8-8-5.9-8-11V5l8-3Z'/%3E%3Cpath fill='none' stroke='white' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m8.5 12 2.2 2.2 4.8-5'/%3E%3C/svg%3E"); content: ""; }
+				@container ggm-health-checkout (max-width: 700px) {
+					.ggm-form-theme-health-checkout .ggm-form-payment-option { grid-template-columns: 25px 58px minmax(0,1fr) auto; min-height: 77px; gap: 16px; padding: 8px 18px; }
+					.ggm-form-theme-health-checkout .ggm-form-payment-option__details { padding-left: 0; }
+					.ggm-form-theme-health-checkout .ggm-form-payment-option__amount { grid-column: 4; grid-row: 1; }
+				}
 				@media (max-width: 600px) {
 					.ggm-phone-country-control {
 						grid-template-columns: minmax(104px, max-content) minmax(0, 1fr);
@@ -1529,11 +1641,61 @@ class GGM_Form_Builder {
 					}
 					.ggm-form-payment-option { grid-column: 1 / -1; grid-template-columns: auto minmax(0,1fr); }
 					.ggm-form-payment-option__amount { grid-column: 2; }
+					.ggm-built-form.ggm-form-theme-health-checkout { height: auto !important; min-height: 0 !important; max-height: none; padding: 18px; align-self: flex-start; }
+					.ggm-form-theme-health-checkout .ggm-builder-public-form,
+					.ggm-form-theme-health-checkout .ggm-form-page { height: auto !important; min-height: 0 !important; max-height: none; }
+					.ggm-form-theme-health-checkout .ggm-form-page { grid-template-columns: minmax(0,1fr); column-gap: 0; }
+					.ggm-form-theme-health-checkout .ggm-form-field,
+					.ggm-form-theme-health-checkout .ggm-field-width-50,
+					.ggm-form-theme-health-checkout .ggm-field-width-30,
+					.ggm-form-theme-health-checkout .ggm-field-width-100 { grid-column: 1 / -1; }
+					.ggm-form-theme-health-checkout .ggm-form-payment-options legend { flex-direction: column; align-items: flex-start; gap: 6px; }
+					.ggm-form-theme-health-checkout .ggm-form-payment-security { width: 100%; margin-left: 0; white-space: nowrap; }
+					.ggm-form-theme-health-checkout .ggm-form-payment-option { grid-template-columns: 25px 48px minmax(0,1fr); grid-template-rows: auto auto; width: 100%; max-width: 100%; height: auto; min-height: 77px; column-gap: 10px; row-gap: 5px; padding: 9px 12px; }
+					.ggm-form-theme-health-checkout .ggm-form-payment-option > input { grid-column: 1; grid-row: 1 / span 2; align-self: center; }
+					.ggm-form-theme-health-checkout .ggm-form-payment-option__icon { grid-column: 2; grid-row: 1 / span 2; align-self: center; width: 48px; height: 48px; }
+					.ggm-form-theme-health-checkout .ggm-form-payment-option__details { grid-column: 3; grid-row: 1; align-self: end; overflow-wrap: anywhere; padding-left: 0; }
+					.ggm-form-theme-health-checkout .ggm-form-payment-option__label { font-size: 16px; }
+					.ggm-form-theme-health-checkout .ggm-form-payment-option__description { font-size: 14px; }
+					.ggm-form-theme-health-checkout .ggm-form-payment-option__amount { grid-column: 3; grid-row: 2; align-self: start; justify-self: start; font-size: 17px; }
+				}
+				@media (max-width: 767px) {
+					/* Applied only to ancestors of this opted-in form by the runtime
+					   below. It releases mobile viewport/flex heights without changing
+					   desktop layout or unrelated forms and sections. */
+					.ggm-health-checkout-auto-height {
+						height: auto !important;
+						block-size: auto !important;
+						min-height: 0 !important;
+						min-block-size: 0 !important;
+						max-height: none !important;
+					}
+					.elementor-widget-shortcode.ggm-health-checkout-auto-height,
+					.elementor-shortcode.ggm-health-checkout-auto-height {
+						width: 100% !important;
+						max-width: 100% !important;
+						height: fit-content !important;
+						block-size: fit-content !important;
+						align-self: auto !important;
+						flex-grow: 0 !important;
+						flex-basis: auto !important;
+					}
+					#ggm-dash.ggm-health-checkout-auto-height {
+						align-items: flex-start;
+					}
+					#ggm-dash .ggm-dash-main-container.ggm-health-checkout-auto-height {
+						flex: 0 0 auto !important;
+						overflow: visible;
+					}
+					#ggm-dash .ggm-main.ggm-health-checkout-auto-height {
+						flex: 0 0 auto;
+						padding-bottom: calc(75px + env(safe-area-inset-bottom));
+					}
 				}
 			</style>
 		<?php endif; ?>
 		<?php $form_heading_tag = self::allowed_value( $settings['form_heading_tag'] ?? 'h2', array( 'h1','h2','h3','h4','h5','h6','p' ), 'h2' ); $form_heading_size = self::heading_size( $settings['form_heading_size'] ?? '' ); ?>
-		<div class="ggm-built-form" data-pages="<?php echo esc_attr( count( $sections ) ); ?>" data-progress="<?php echo esc_attr( $settings['progress'] ?? 'bar' ); ?>" data-dashboard-auto-popup="<?php echo $dashboard_auto_popup ? '1' : '0'; ?>">
+		<div class="ggm-built-form<?php echo $health_checkout_theme ? ' ggm-form-theme-health-checkout' : ''; ?>" data-pages="<?php echo esc_attr( count( $sections ) ); ?>" data-progress="<?php echo esc_attr( $settings['progress'] ?? 'bar' ); ?>" data-dashboard-auto-popup="<?php echo $dashboard_auto_popup ? '1' : '0'; ?>">
 			<<?php echo esc_attr( $form_heading_tag ); ?> class="ggm-form-title"<?php echo $form_heading_size ? ' style="font-size:' . esc_attr( $form_heading_size ) . 'px"' : ''; ?>><?php echo esc_html( $form->title ); ?></<?php echo esc_attr( $form_heading_tag ); ?>>
 			<?php if ( ! empty( $settings['description'] ) ) : ?><p><?php echo esc_html( $settings['description'] ); ?></p><?php endif; ?>
 			<form class="ggm-builder-public-form" enctype="multipart/form-data">
@@ -1555,16 +1717,36 @@ class GGM_Form_Builder {
 								<?php if ( 1 === count( $payment_options ) ) : ?>
 									<?php $option = $payment_options[0]; ?>
 									<input type="hidden" name="payment_option_id" value="<?php echo esc_attr( $option['id'] ); ?>">
-									<div class="ggm-form-payment-options__choices"><div class="ggm-form-payment-option ggm-form-payment-option--single"><span class="ggm-form-payment-option__label"><?php echo esc_html( $option['label'] ); ?></span><span class="ggm-form-payment-option__amount"><?php echo esc_html( self::format_payment_option_amount( $option['amount'], $settings['payment_currency'] ?? ggm_get_setting( 'ggm_currency', 'INR' ) ) ); ?></span></div></div>
+									<div class="ggm-form-payment-options__choices"><div class="ggm-form-payment-option ggm-form-payment-option--single"><span class="ggm-form-payment-option__label"><?php echo esc_html( $option['label'] ); ?></span><span class="ggm-form-payment-option__amount"><?php echo esc_html( $health_checkout_theme ? self::format_health_checkout_amount( $option['amount'], $settings['payment_currency'] ?? ggm_get_setting( 'ggm_currency', 'INR' ) ) : self::format_payment_option_amount( $option['amount'], $settings['payment_currency'] ?? ggm_get_setting( 'ggm_currency', 'INR' ) ) ); ?></span></div></div>
 								<?php else : ?>
-									<legend><?php esc_html_e( 'Choose a price', 'ggm-member-dashboard' ); ?></legend>
+									<legend><?php echo $health_checkout_theme ? esc_html__( 'Choose a plan', 'ggm-member-dashboard' ) : esc_html__( 'Choose a price', 'ggm-member-dashboard' ); ?><?php if ( $health_checkout_theme ) : ?><span class="ggm-form-payment-security"><?php esc_html_e( 'Secure & encrypted payment', 'ggm-member-dashboard' ); ?></span><?php endif; ?></legend>
 									<div class="ggm-form-payment-options__choices">
 										<?php foreach ( $payment_options as $option_index => $option ) : ?>
-											<?php $option_input_id = 'ggm-form-payment-' . $form->id . '-' . $context . '-' . $context_id . '-' . $option['id']; ?>
+											<?php
+											$option_input_id = 'ggm-form-payment-' . $form->id . '-' . $context . '-' . $context_id . '-' . $option['id'];
+											$option_description = (string) ( $option['description'] ?? '' );
+											// Form 3 is the supplied three-tier health checkout. These are visual
+											// defaults only; a saved Plan subtitle always takes precedence.
+											if ( ! $option_description && $health_checkout_theme && 3 === (int) $form->id ) {
+												$reference_subtitles = array( 'Basic health guidance', 'Chronic health concerns', 'Everything in ₹1000 plan + more' );
+												$option_description = $reference_subtitles[ $option_index ] ?? '';
+											}
+											?>
 											<label class="ggm-form-payment-option" for="<?php echo esc_attr( $option_input_id ); ?>">
-												<input id="<?php echo esc_attr( $option_input_id ); ?>" type="radio" name="payment_option_id" value="<?php echo esc_attr( $option['id'] ); ?>"<?php echo 0 === $option_index ? ' required' : ''; ?>>
-												<span class="ggm-form-payment-option__label"><?php echo esc_html( $option['label'] ); ?></span>
-												<span class="ggm-form-payment-option__amount"><?php echo esc_html( self::format_payment_option_amount( $option['amount'], $settings['payment_currency'] ?? ggm_get_setting( 'ggm_currency', 'INR' ) ) ); ?></span>
+											<input id="<?php echo esc_attr( $option_input_id ); ?>" type="radio" name="payment_option_id" value="<?php echo esc_attr( $option['id'] ); ?>"<?php echo 0 === $option_index ? ' required' : ''; ?><?php echo $health_checkout_theme && 0 === $option_index ? ' checked' : ''; ?>>
+											<?php if ( $health_checkout_theme ) : ?>
+												<span class="ggm-form-payment-option__icon" aria-hidden="true">
+													<?php if ( 0 === $option_index ) : ?>
+														<svg aria-hidden="true" class="e-font-icon-svg e-fas-leaf" viewBox="0 0 576 512" xmlns="http://www.w3.org/2000/svg"><path d="M546.2 9.7c-5.6-12.5-21.6-13-28.3-1.2C486.9 62.4 431.4 96 368 96h-80C182 96 96 182 96 288c0 7 .8 13.7 1.5 20.5C161.3 262.8 253.4 224 384 224c8.8 0 16 7.2 16 16s-7.2 16-16 16C132.6 256 26 410.1 2.4 468c-6.6 16.3 1.2 34.9 17.5 41.6 16.4 6.8 35-1.1 41.8-17.3 1.5-3.6 20.9-47.9 71.9-90.6 32.4 43.9 94 85.8 174.9 77.2C465.5 467.5 576 326.7 576 154.3c0-50.2-10.8-102.2-29.8-144.6z"></path></svg>
+													<?php elseif ( 1 === $option_index ) : ?>
+														<svg aria-hidden="true" class="e-font-icon-svg e-fas-brain" viewBox="0 0 576 512" xmlns="http://www.w3.org/2000/svg"><path d="M208 0c-29.9 0-54.7 20.5-61.8 48.2-.8 0-1.4-.2-2.2-.2-35.3 0-64 28.7-64 64 0 4.8.6 9.5 1.7 14C52.5 138 32 166.6 32 200c0 12.6 3.2 24.3 8.3 34.9C16.3 248.7 0 274.3 0 304c0 33.3 20.4 61.9 49.4 73.9-.9 4.6-1.4 9.3-1.4 14.1 0 39.8 32.2 72 72 72 4.1 0 8.1-.5 12-1.2 9.6 28.5 36.2 49.2 68 49.2 39.8 0 72-32.2 72-72V64c0-35.3-28.7-64-64-64zm368 304c0-29.7-16.3-55.3-40.3-69.1 5.2-10.6 8.3-22.3 8.3-34.9 0-33.4-20.5-62-49.7-74 1-4.5 1.7-9.2 1.7-14 0-35.3-28.7-64-64-64-.8 0-1.5.2-2.2.2C422.7 20.5 397.9 0 368 0c-35.3 0-64 28.6-64 64v376c0 39.8 32.2 72 72 72 31.8 0 58.4-20.7 68-49.2 3.9.7 7.9 1.2 12 1.2 39.8 0 72-32.2 72-72 0-4.8-.5-9.5-1.4-14.1 29-12 49.4-40.6 49.4-73.9z"></path></svg>
+													<?php else : ?>
+														<svg aria-hidden="true" class="e-font-icon-svg e-fas-crown" viewBox="0 0 640 512" xmlns="http://www.w3.org/2000/svg"><path d="M528 448H112c-8.8 0-16 7.2-16 16v32c0 8.8 7.2 16 16 16h416c8.8 0 16-7.2 16-16v-32c0-8.8-7.2-16-16-16zm64-320c-26.5 0-48 21.5-48 48 0 7.1 1.6 13.7 4.4 19.8L476 239.2c-15.4 9.2-35.3 4-44.2-11.6L350.3 85C361 76.2 368 63 368 48c0-26.5-21.5-48-48-48s-48 21.5-48 48c0 15 7 28.2 17.7 37l-81.5 142.6c-8.9 15.6-28.9 20.8-44.2 11.6l-72.3-43.4c2.7-6 4.4-12.7 4.4-19.8 0-26.5-21.5-48-48-48S0 149.5 0 176s21.5 48 48 48c2.6 0 5.2-.4 7.7-.8L128 416h384l72.3-192.8c2.5.4 5.1.8 7.7.8 26.5 0 48-21.5 48-48s-21.5-48-48-48z"></path></svg>
+													<?php endif; ?>
+												</span>
+											<?php endif; ?>
+											<span class="ggm-form-payment-option__details"><span class="ggm-form-payment-option__label"><?php echo esc_html( $option['label'] ); ?></span><?php if ( $health_checkout_theme && $option_description ) : ?><span class="ggm-form-payment-option__description"><?php echo esc_html( $option_description ); ?></span><?php endif; ?></span>
+											<span class="ggm-form-payment-option__amount"><?php echo esc_html( $health_checkout_theme ? self::format_health_checkout_amount( $option['amount'], $settings['payment_currency'] ?? ggm_get_setting( 'ggm_currency', 'INR' ) ) : self::format_payment_option_amount( $option['amount'], $settings['payment_currency'] ?? ggm_get_setting( 'ggm_currency', 'INR' ) ) ); ?></span>
 											</label>
 										<?php endforeach; ?>
 									</div>
@@ -1579,11 +1761,15 @@ class GGM_Form_Builder {
 					<?php if ( $duplicate_first_heading ) : ?></div><?php else : ?></section><?php endif; ?>
 				<?php endforeach; ?>
 				<?php if ( $has_multiple_pages ) : ?><div class="ggm-form-progress" aria-live="polite"></div><?php endif; ?><div class="ggm-form-feedback" aria-live="polite"></div>
+				<?php if ( $health_checkout_theme ) : ?><div class="ggm-form-security-note"><?php esc_html_e( 'Your information is safe with us', 'ggm-member-dashboard' ); ?></div><?php endif; ?>
 			</form>
 			<?php echo self::post_submit_fields_html( $post_submit_fields, 'post-submit-' . $form->id . '-' . $context . '-' . $context_id . '-', $user_id, true ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- fields are rendered with escaping. ?>
 		</div>
 		<script>
 		(function(){var root=document.currentScript.previousElementSibling,form=root.querySelector('form'),pages=[].slice.call(form.querySelectorAll('.ggm-form-page')),current=0,feedback=form.querySelector('.ggm-form-feedback'),progress=form.querySelector('.ggm-form-progress');
+		function releaseMobileHostHeight(){if(!root.classList.contains('ggm-form-theme-health-checkout'))return;var selector='#ggm-dash,.ggm-dash-main-container,.ggm-main,.ggm-tab,.elementor-widget-shortcode,.elementor-widget-container,.elementor-shortcode,.e-con,.e-con-inner,.elementor-section,.elementor-container,.elementor-column,.elementor-widget-wrap',tab=root.closest('.ggm-tab'),enabled=!tab||tab.classList.contains('active'),node=root;while(node&&node!==document.body){if(node===root||(node.matches&&node.matches(selector)))node.classList.toggle('ggm-health-checkout-auto-height',enabled);node=node.parentElement;}}
+		releaseMobileHostHeight();
+		var formDashboardTab=root.closest('.ggm-tab');if(formDashboardTab&&window.MutationObserver)new MutationObserver(releaseMobileHostHeight).observe(formDashboardTab,{attributes:true,attributeFilter:['class']});
 		function updateProgress(){if(!progress)return;var mode=root.dataset.progress;if(mode==='none'){progress.textContent='';progress.style.background='';return}if(mode==='bar'){progress.innerHTML='<span style="display:block;height:6px;background:#2271b1;width:'+(((current+1)/pages.length)*100)+'%"></span>';progress.style.background='#e5e7eb'}else{progress.textContent='Page '+(current+1)+' of '+pages.length;progress.style.background=''}}
 		function show(n){pages[current].hidden=true;current=n;pages[current].hidden=false;updateProgress();pages[current].scrollIntoView({behavior:'smooth',block:'start'});}
 		function customValid(){var ok=true;pages[current].querySelectorAll('.ggm-form-field').forEach(function(box){var cfg={};try{cfg=JSON.parse(box.dataset.config||'{}')}catch(e){}var inputs=[].slice.call(box.querySelectorAll('input,textarea,select')),anchor=inputs[0],phoneInput=box.querySelector('.ggm-phone-country-control input[type=tel]');if(phoneInput)anchor=phoneInput;if(!anchor)return;inputs.forEach(function(i){i.setCustomValidity('')});var message=cfg.validation_message||'Please check this response.';if(cfg.type==='checkboxes'){var checked=box.querySelectorAll('input[type=checkbox]:checked'),count=checked.length,target=Number(cfg.selection_count||0);if(cfg.required&&!count)anchor.setCustomValidity(message);if(target&&((cfg.selection_rule==='at_least'&&count<target)||(cfg.selection_rule==='at_most'&&count>target)||(cfg.selection_rule==='exactly'&&count!==target)))anchor.setCustomValidity(message)}var other=box.querySelector('input[value=\"__other__\"]:checked');if(other){var otherInput=box.querySelector('.ggm-other-input');if(otherInput&&!otherInput.value.trim())otherInput.setCustomValidity(message)}if((cfg.type==='short_answer'||cfg.type==='paragraph')&&anchor.value){if(cfg.regex_pattern&&!cfg.phone_country_enabled){try{if(!(new RegExp(cfg.regex_pattern)).test(anchor.value))anchor.setCustomValidity(message)}catch(e){anchor.setCustomValidity(message)}}if(cfg.validation_type==='number'&&cfg.phone_country_enabled){if(anchor.value.replace(/\D/g,'').length<7)anchor.setCustomValidity(message)}else if(cfg.validation_type==='number'&&cfg.number_rule&&cfg.number_rule!=='none'){var n=Number(anchor.value),a=Number(cfg.number_value),b=Number(cfg.number_value_to),pass=true;if(cfg.number_rule==='greater_than')pass=n>a;else if(cfg.number_rule==='greater_or_equal')pass=n>=a;else if(cfg.number_rule==='less_than')pass=n<a;else if(cfg.number_rule==='less_or_equal')pass=n<=a;else if(cfg.number_rule==='equal')pass=n===a;else if(cfg.number_rule==='not_equal')pass=n!==a;else if(cfg.number_rule==='between')pass=n>=Math.min(a,b)&&n<=Math.max(a,b);if(!pass)anchor.setCustomValidity(message)}}if(cfg.type==='file_upload'){var upload=box.querySelector('.ggm-upload-control');if(upload&&upload._validate&&!upload._validate())ok=false;if(anchor.files){if(anchor.files.length>Number(cfg.max_files||1))anchor.setCustomValidity(message);for(var f=0;f<anchor.files.length;f++){if(anchor.files[f].size>Number(cfg.max_size||10)*1024*1024)anchor.setCustomValidity(message)}}}if(cfg.type==='checkbox_grid'&&cfg.require_each_row){box.querySelectorAll('tbody tr').forEach(function(row){if(!row.querySelector('input:checked')){(row.querySelector('input')||anchor).setCustomValidity(message)}})}if(cfg.type==='multiple_choice_grid'&&cfg.limit_one_per_column){var used={};box.querySelectorAll('tbody input:checked').forEach(function(i){if(used[i.value])i.setCustomValidity(message);used[i.value]=true})}if(cfg.type==='time'&&cfg.time_type==='duration'&&cfg.required){var total=0;inputs.forEach(function(i){total+=Number(i.value||0)});if(!total)anchor.setCustomValidity(message)}if(cfg.type==='chip_selector'){var chips=box.querySelector('.ggm-chip-selector');if(chips&&chips._validate&&!chips._validate())ok=false}if(cfg.type==='search_select'){var search=box.querySelector('.ggm-search-select');if(search&&search._validate&&!search._validate())ok=false}inputs.forEach(function(i){if(!i.checkValidity())ok=false})});return ok}
@@ -1597,9 +1783,11 @@ class GGM_Form_Builder {
 		function validatePostSubmit(box){var ok=true;box.querySelectorAll('input,textarea,select').forEach(function(i){i.setCustomValidity&&i.setCustomValidity('')});box.querySelectorAll('.ggm-upload-control').forEach(function(upload){if(upload._validate&&!upload._validate())ok=false});box.querySelectorAll('.ggm-chip-selector,.ggm-search-select').forEach(function(widget){if(widget._validate&&!widget._validate())ok=false});box.querySelectorAll('input,textarea,select').forEach(function(i){if(!i.checkValidity())ok=false});if(!ok){var first=[].slice.call(box.querySelectorAll('input,textarea,select')).find(function(i){return !i.checkValidity()});if(first&&first.reportValidity)first.reportValidity()}return ok}
 		function finishPostSubmit(box,message){var disclosure=box.closest('.ggm-post-submit-disclosure'),openButton=disclosure&&disclosure.querySelector('.ggm-post-submit-open');if(openButton)openButton.remove();box.innerHTML='<div class="ggm-form-success" role="status">'+(message||'Additional details saved.')+'</div>'}
 		function savePostSubmit(button){var box=button.closest('.ggm-post-submit-fields');if(!box||!validatePostSubmit(box))return;button.disabled=true;postSubmitFeedback(box,'Saving additional details...',false);var data=new FormData(form);data.set('action','ggm_update_builder_form_after_submit');data.set('submission_id',root.dataset.submissionId||'');data.set('after_submit_token',root.dataset.afterSubmitToken||'');fetch('<?php echo esc_url( admin_url( 'admin-ajax.php' ) ); ?>',{method:'POST',credentials:'same-origin',body:data}).then(function(r){return r.json();}).then(function(r){if(!r.success)throw new Error((r.data&&r.data.message)||'Could not save additional details.');finishPostSubmit(box,(r.data&&r.data.message)||'Additional details saved.');if(r.data&&r.data.files_html){var host=document.querySelector('.ggm-health-uploaded-files-host'),intro=document.querySelector('.ggm-health-uploaded-intro');if(host)host.innerHTML=r.data.files_html;if(intro)intro.hidden=true;}}).catch(function(err){button.disabled=false;postSubmitFeedback(box,err.message,true);})}
-		function loadRazorpay(){if(window.Razorpay)return Promise.resolve();if(window.ggmRazorpayLoading)return window.ggmRazorpayLoading;window.ggmRazorpayLoading=new Promise(function(resolve,reject){var s=document.createElement('script');s.src='https://checkout.razorpay.com/v1/checkout.js';s.async=true;s.onload=resolve;s.onerror=function(){reject(new Error('Could not load Razorpay. Please try again.'));};document.head.appendChild(s);});return window.ggmRazorpayLoading;}
-		function postForm(action){var data=new FormData(form);data.set('action',action);return fetch('<?php echo esc_url( admin_url( 'admin-ajax.php' ) ); ?>',{method:'POST',credentials:'same-origin',body:data}).then(function(r){return r.json();});}
-		function payAndSubmit(button){if(!valid())return;setBusy(button,true,'Creating payment order…');postForm('ggm_create_form_payment').then(function(r){if(!r.success)throw new Error((r.data&&r.data.message)||'Payment order failed.');return loadRazorpay().then(function(){return r.data;});}).then(function(order){var rzp=new Razorpay({key:order.key_id,amount:order.amount,currency:order.currency,name:order.name||<?php echo wp_json_encode( get_bloginfo( 'name' ) ); ?>,description:order.description||button.dataset.paymentLabel||'Form payment',order_id:order.order_id,handler:function(response){feedback.textContent='Verifying payment…';var data=new FormData();data.set('action','ggm_verify_form_payment');data.set('form_payment_id',order.form_payment_id);data.set('guest_payment_token',order.guest_payment_token||'');data.set('razorpay_order_id',response.razorpay_order_id);data.set('razorpay_payment_id',response.razorpay_payment_id);data.set('razorpay_signature',response.razorpay_signature);fetch('<?php echo esc_url( admin_url( 'admin-ajax.php' ) ); ?>',{method:'POST',credentials:'same-origin',body:data}).then(function(r){return r.json();}).then(function(v){if(!v.success)throw new Error((v.data&&v.data.message)||'Payment verification failed.');if(v.data&&v.data.payment_first_reload){window.location.reload();return;}showSuccess(v.data,'Payment received. Your response has been submitted.');}).catch(function(err){feedback.textContent=err.message;setBusy(button,false);});},modal:{ondismiss:function(){feedback.textContent='Payment was cancelled. You can try again.';setBusy(button,false);}}});rzp.on('payment.failed',function(response){feedback.textContent=(response.error&&response.error.description)||'Payment failed. Please try again.';setBusy(button,false);});rzp.open();}).catch(function(err){feedback.textContent=err.message;setBusy(button,false);});}
+		function loadRazorpay(){if(typeof window.Razorpay==='function')return Promise.resolve();if(window.ggmRazorpayLoading)return window.ggmRazorpayLoading;window.ggmRazorpayLoading=new Promise(function(resolve,reject){var s=document.createElement('script');s.src='https://checkout.razorpay.com/v1/checkout.js';s.async=true;s.onload=function(){if(typeof window.Razorpay==='function')resolve();else reject(new Error('Razorpay checkout did not initialize. Please try again.'));};s.onerror=function(){reject(new Error('Could not load Razorpay. Please try again.'));};document.head.appendChild(s);});return window.ggmRazorpayLoading;}
+		function postData(data){return fetch('<?php echo esc_url( admin_url( 'admin-ajax.php' ) ); ?>',{method:'POST',credentials:'same-origin',cache:'no-store',body:data}).then(function(response){return response.text().then(function(text){var payload;try{payload=JSON.parse(text);}catch(error){throw new Error(response.ok?'The payment server returned an invalid response. Please refresh and try again.':'The payment request failed (HTTP '+response.status+'). Please try again.');}return payload;});});}
+		function postForm(action){var data=new FormData(form);data.set('action',action);return postData(data);}
+		function refreshPaymentNonce(){var data=new FormData(),formId=form.querySelector('[name="form_id"]'),version=form.querySelector('[name="form_version"]'),nonce=form.querySelector('[name="nonce"]'),context=form.querySelector('[name="context_type"]'),contextId=form.querySelector('[name="context_id"]');data.set('action','ggm_refresh_form_payment_nonce');data.set('form_id',formId?formId.value:'');data.set('form_version',version?version.value:'');data.set('context_type',context?context.value:'shortcode');data.set('context_id',contextId?contextId.value:'0');return postData(data).then(function(result){if(!result.success||!result.data)throw new Error((result.data&&result.data.message)||'Could not refresh the payment session. Please reload and try again.');if(version)version.value=result.data.form_version;if(nonce)nonce.value=result.data.nonce;return result.data;});}
+		function payAndSubmit(button){if(!valid())return;setBusy(button,true,'Creating payment order…');refreshPaymentNonce().then(function(){return postForm('ggm_create_form_payment');}).then(function(r){if(!r.success)throw new Error((r.data&&r.data.message)||'Payment order failed.');if(!r.data||!r.data.key_id||!r.data.order_id||!r.data.form_payment_id)throw new Error('The payment order is incomplete. Please try again.');return loadRazorpay().then(function(){return r.data;});}).then(function(order){var rzp=new Razorpay({key:order.key_id,amount:order.amount,currency:order.currency,name:order.name||<?php echo wp_json_encode( get_bloginfo( 'name' ) ); ?>,description:order.description||button.dataset.paymentLabel||'Form payment',order_id:order.order_id,handler:function(response){feedback.textContent='Verifying payment…';var data=new FormData();data.set('action','ggm_verify_form_payment');data.set('form_payment_id',order.form_payment_id);data.set('guest_payment_token',order.guest_payment_token||'');data.set('razorpay_order_id',response.razorpay_order_id);data.set('razorpay_payment_id',response.razorpay_payment_id);data.set('razorpay_signature',response.razorpay_signature);postData(data).then(function(v){if(!v.success)throw new Error((v.data&&v.data.message)||'Payment verification failed.');if(v.data&&v.data.payment_first_reload){window.location.reload();return;}showSuccess(v.data,'Payment received. Your response has been submitted.');}).catch(function(err){feedback.textContent=err.message;setBusy(button,false);});},modal:{ondismiss:function(){feedback.textContent='Payment was cancelled. You can try again.';setBusy(button,false);}}});rzp.on('payment.failed',function(response){feedback.textContent=(response.error&&response.error.description)||'Payment failed. Please try again.';setBusy(button,false);});rzp.open();}).catch(function(err){feedback.textContent=err.message;setBusy(button,false);});}
 		form.addEventListener('submit',function(e){e.preventDefault();if(!valid())return;var button=form.querySelector('[type=submit]');setBusy(button,true,'Submitting…');postForm('ggm_submit_builder_form').then(function(r){if(!r.success)throw new Error((r.data&&r.data.message)||'Submission failed.');showSuccess(r.data,'Thank you. Your response has been submitted.');}).catch(function(err){feedback.textContent=err.message;setBusy(button,false);});});
 		})();
 		</script>
@@ -1634,14 +1822,14 @@ class GGM_Form_Builder {
 		var hidden=picker.querySelector('input[type=hidden]');
 		var toggle=picker.querySelector('.ggm-country-picker-button');
 		var label=toggle?toggle.querySelector('span'):null;
-		var flag=toggle?toggle.querySelector('img'):null;
+		var flag=toggle?toggle.querySelector('.ggm-country-flag'):null;
 		var search=picker.querySelector('.ggm-country-search');
 		var options=[].slice.call(picker.querySelectorAll('.ggm-country-option'));
 		if(!hidden||!toggle||!label||!flag)return;
 		function choose(option){
-			hidden.value=option.dataset.value||hidden.value;
-			label.textContent=option.dataset.label||label.textContent;
-			if(option.dataset.flag)flag.src=option.dataset.flag;
+			hidden.value=option.dataset.code||option.dataset.value||hidden.value;
+			label.textContent=option.dataset.code||option.dataset.label||label.textContent;
+			var selectedFlag=option.querySelector('.ggm-country-flag');if(selectedFlag){var replacement=selectedFlag.cloneNode(true);flag.replaceWith(replacement);flag=replacement;}
 			options.forEach(function(item){item.setAttribute('aria-selected',item===option?'true':'false')});
 			picker.classList.remove('is-open');
 			toggle.setAttribute('aria-expanded','false');
@@ -2121,21 +2309,21 @@ JS;
 					if ( $country_digits && 0 === strpos( $phone_digits, $country_digits ) ) {
 						$phone_digits = substr( $phone_digits, strlen( $country_digits ) );
 					}
-					$lengths = ( ! empty( $field['min_length'] ) ? ' minlength="' . esc_attr( $field['min_length'] ) . '"' : '' ) . ( ! empty( $field['max_length'] ) ? ' maxlength="' . esc_attr( $field['max_length'] ) . '"' : '' );
+					$lengths = ( ! empty( $field['min_length'] ) ? ' minlength="' . esc_attr( $field['min_length'] ) . '"' : '' ) . ' maxlength="' . esc_attr( ! empty( $field['max_length'] ) ? min( 15, (int) $field['max_length'] ) : 15 ) . '"';
 					$countries = self::country_calling_codes();
 					$selected_country = null;
 					foreach ( $countries as $country ) {
 						if ( $selected_iso === $country['iso'] ) { $selected_country = $country; break; }
 					}
 					if ( ! $selected_country ) {
-						$selected_country = array( 'iso' => 'IN', 'dial' => '+91', 'name' => 'India', 'flag' => self::country_flag_url( 'IN' ) );
+						$selected_country = array( 'iso' => 'IN', 'dial' => '+91', 'name' => 'India' );
 					}
 					$selected_label = $selected_country['dial'];
-					echo '<div class="ggm-phone-country-control"><div class="ggm-country-picker" data-country-picker><input type="hidden" name="answers_country_code[' . esc_attr( $key ) . ']" value="' . esc_attr( $selected_country['dial'] ) . '"><button type="button" class="ggm-country-picker-button" aria-haspopup="listbox" aria-expanded="false"' . $labelledby . '><img class="ggm-country-flag" src="' . esc_url( $selected_country['flag'] ) . '" alt=""><span>' . esc_html( $selected_label ) . '</span></button><div class="ggm-country-options" role="listbox"><input type="search" class="ggm-country-search" placeholder="' . esc_attr__( 'Search country or code', 'ggm-member-dashboard' ) . '" aria-label="' . esc_attr__( 'Search countries', 'ggm-member-dashboard' ) . '">';
+					echo '<div class="ggm-phone-country-control"><div class="ggm-country-picker" data-country-picker><input type="hidden" name="answers_country_code[' . esc_attr( $key ) . ']" value="' . esc_attr( $selected_country['dial'] ) . '"><button type="button" class="ggm-country-picker-button" aria-haspopup="listbox" aria-expanded="false"' . $labelledby . '>' . self::country_flag_svg( $selected_country['iso'] ) . '<span>' . esc_html( $selected_label ) . '</span></button><div class="ggm-country-options" role="listbox"><input type="search" class="ggm-country-search" placeholder="' . esc_attr__( 'Search country or code', 'ggm-member-dashboard' ) . '" aria-label="' . esc_attr__( 'Search countries', 'ggm-member-dashboard' ) . '">';
 					foreach ( self::country_calling_codes() as $country ) {
 						$label = $country['dial'];
 						$country_name = self::country_display_name( $country['iso'] );
-						echo '<button type="button" class="ggm-country-option" role="option" data-value="' . esc_attr( $country['dial'] ) . '" data-label="' . esc_attr( $label ) . '" data-flag="' . esc_url( $country['flag'] ) . '" data-search="' . esc_attr( strtolower( $country_name . ' ' . $country['iso'] . ' ' . $country['dial'] ) ) . '" title="' . esc_attr( $country_name . ' ' . $country['dial'] ) . '" aria-selected="' . ( $selected_iso === $country['iso'] ? 'true' : 'false' ) . '"><img class="ggm-country-flag" src="' . esc_url( $country['flag'] ) . '" alt="" loading="lazy"><span>' . esc_html( $country_name . ' ' . $label ) . '</span></button>';
+						echo '<button type="button" class="ggm-country-option" role="option" data-value="' . esc_attr( $country['dial'] ) . '" data-label="' . esc_attr( $label ) . '" data-iso="' . esc_attr( strtolower( $country['iso'] ) ) . '" data-search="' . esc_attr( strtolower( $country_name . ' ' . $country['iso'] . ' ' . $country['dial'] ) ) . '" title="' . esc_attr( $country_name . ' ' . $country['dial'] ) . '" aria-selected="' . ( $selected_iso === $country['iso'] ? 'true' : 'false' ) . '">' . self::country_flag_svg( $country['iso'] ) . '<span>' . esc_html( $country_name . ' ' . $label ) . '</span></button>';
 					}
 					echo '</div></div><input type="tel" name="' . esc_attr( $name ) . '" value="' . esc_attr( $phone_digits ) . '" placeholder="' . esc_attr( $field['placeholder'] ?: __( 'Phone number', 'ggm-member-dashboard' ) ) . '" inputmode="tel" autocomplete="tel-national"' . $labelledby . $lengths . $req . '></div>';
 					break;
@@ -2363,6 +2551,45 @@ JS;
 		wp_send_json_success( array_merge( $response, $this->post_submit_response_data( $result['submission_id'], $result['schema'] ) ) );
 	}
 
+	/**
+	 * Return a current, short-lived authorization token for a payment form.
+	 *
+	 * Shortcode and page-builder output is commonly cached. Fetching the token
+	 * immediately before order creation keeps a cached form usable after an
+	 * administrator publishes a newer form version.
+	 */
+	public function refresh_form_payment_nonce() {
+		$form_id = absint( $_POST['form_id'] ?? 0 );
+		$form    = self::get_form( $form_id );
+		if ( ! $form || 'published' !== $form->status ) {
+			wp_send_json_error( array( 'message' => __( 'This form is unavailable.', 'ggm-member-dashboard' ) ), 404 );
+		}
+
+		$settings = json_decode( (string) $form->settings_json, true );
+		$settings = is_array( $settings ) ? $settings : array();
+		if ( empty( $settings['payment_enabled'] ) || ! self::get_payment_options( $settings ) ) {
+			wp_send_json_error( array( 'message' => __( 'Payment is not configured for this form.', 'ggm-member-dashboard' ) ), 400 );
+		}
+
+		$context    = sanitize_key( wp_unslash( $_POST['context_type'] ?? 'shortcode' ) );
+		$context_id = absint( $_POST['context_id'] ?? 0 );
+		if ( in_array( $context, array( 'dashboard', 'elementor_popup', 'shortcode' ), true ) ) {
+			$context_id = 0;
+		}
+		if ( ! $this->context_allowed( $form_id, $context, $context_id ) ) {
+			wp_send_json_error( array( 'message' => __( 'This form is not assigned here.', 'ggm-member-dashboard' ) ), 403 );
+		}
+
+		$form_version = absint( $_POST['form_version'] ?? 0 );
+		if ( ! $form_version || empty( self::get_schema( $form, $form_version )['sections'] ) ) {
+			$form_version = (int) $form->current_version;
+		}
+		wp_send_json_success( array(
+			'form_version' => $form_version,
+			'nonce'        => wp_create_nonce( 'ggm_submit_form_' . $form_id . '_' . $form_version ),
+		) );
+	}
+
 	public function create_form_payment() {
 		$form_id = absint( $_POST['form_id'] ?? 0 );
 		$preflight_form = self::get_form( $form_id );
@@ -2378,7 +2605,10 @@ JS;
 		$user_id  = $result['user_id'];
 		$selected_option = self::payment_option_by_id( $settings, $_POST['payment_option_id'] ?? '' );
 		$amount   = $selected_option ? (float) $selected_option['amount'] : 0.0;
-		$currency = strtoupper( sanitize_text_field( $settings['payment_currency'] ?? ggm_get_setting( 'ggm_currency', 'INR' ) ) );
+		// Existing forms may still contain the former free-text value (for
+		// example the rupee symbol). Repair it at runtime so users can pay
+		// immediately without requiring an administrator to re-save the form.
+		$currency = self::payment_currency( $settings['payment_currency'] ?? ggm_get_setting( 'ggm_currency', 'INR' ) );
 
 		if ( $amount <= 0 ) {
 			$this->delete_failed_submission( $result['submission_id'] );
@@ -2613,7 +2843,9 @@ JS;
 		if ( ! is_user_logged_in() && empty( $settings['allow_guests'] ) ) { wp_send_json_error( array( 'message'=>__( 'Please log in again.', 'ggm-member-dashboard' ) ), 401 ); }
 		$form_version = absint( $_POST['form_version'] ?? 0 );
 		if ( ! $form_version ) { wp_send_json_error( array( 'message'=>__( 'This form has changed. Refresh the page and try again.', 'ggm-member-dashboard' ) ), 409 ); }
-		check_ajax_referer( 'ggm_submit_form_' . $form_id . '_' . $form_version, 'nonce' );
+		if ( ! check_ajax_referer( 'ggm_submit_form_' . $form_id . '_' . $form_version, 'nonce', false ) ) {
+			wp_send_json_error( array( 'message' => __( 'Your form session expired. Please refresh the page and try again.', 'ggm-member-dashboard' ) ), 403 );
+		}
 		$context = sanitize_key( $_POST['context_type'] ?? 'dashboard' );
 		$context_id = absint( $_POST['context_id'] ?? 0 );
 		if ( in_array( $context, array( 'dashboard','elementor_popup','shortcode' ), true ) ) { $context_id = 0; }
@@ -2877,8 +3109,8 @@ JS;
 		}
 		if ( 'phone' === $validation || ( 'number' === $validation && ! empty( $field['phone_country_enabled'] ) ) ) {
 			$dial = self::sanitize_country_dial( $_POST['answers_country_code'][ $field['key'] ] ?? ( $field['phone_country_code'] ?? '+91' ) );
-			$digits = preg_replace( '/\D/', '', (string) wp_unslash( $value ) );
-			return strlen( $digits ) >= 7 ? $dial . ' ' . $digits : new WP_Error( 'invalid', $message ?: __( 'Enter a valid phone number.', 'ggm-member-dashboard' ) );
+			$digits = ggm_normalize_member_phone( wp_unslash( $value ), $dial );
+			return '' !== $digits ? $dial . ' ' . $digits : new WP_Error( 'invalid', $message ?: __( 'Enter a valid phone number.', 'ggm-member-dashboard' ) );
 		}
 		if ( 'url' === $validation ) {
 			$url = esc_url_raw( $text, array( 'http','https' ) ); return $url && wp_http_validate_url( $url ) ? $url : new WP_Error( 'invalid', $message ?: __( 'Enter a valid URL.', 'ggm-member-dashboard' ) );

@@ -9,6 +9,12 @@
   gap: 20px;
   margin-top: 16px;
 }
+.ggm-ws-discover__item {
+    background: #ffffff;
+    padding: 1em;
+    border-radius: 15px;
+    box-shadow: 0 4px 6px rgba(50, 50, 93, 0.11), 0 1px 3px rgba(0, 0, 0, 0.08);
+}
 
 .ggm-product-card {
   background: #fff;
@@ -1012,11 +1018,10 @@
 /* Combined Workshop booking card. Its date, price, and CTA are independent
    panels so each section retains its own complete rounded outline. */
 .ggm-workshop-booking-card-wrap {
-  --ggm-ws-card-primary: var(--e-global-color-primary, var(--wp--preset--color--primary, transparent));
-  --ggm-ws-card-text: var(--e-global-color-text, var(--wp--preset--color--foreground, currentColor));
-  box-sizing: border-box;
-  width: min(100%, 460px);
-  color: var(--ggm-ws-card-text);
+    --ggm-ws-card-primary: var(--e-global-color-primary, var(--wp--preset--color--primary, transparent));
+    --ggm-ws-card-text: var(--e-global-color-text, var(--wp--preset--color--foreground, currentColor));
+    box-sizing: border-box;
+    color: var(--ggm-ws-card-text);
 }
 .ggm-workshop-booking-card {
     box-sizing: border-box;
@@ -1118,7 +1123,9 @@
     text-align: center; }
 .ggm-workshop-booking-card__price-content,
 .ggm-workshop-booking-card__price-meta { display: grid; gap: 2px; }
-.ggm-workshop-booking-card__price-meta { flex: 1 1 50%; border-left: 1px solid currentColor; padding-left: 18px; }
+.ggm-workshop-booking-card__price-meta {     flex: 1 1 50%;
+    border-left: 1px solid rgb(224 224 224);
+    padding-left: 18px; }
 .ggm-workshop-booking-card__price-label,
 .ggm-workshop-booking-card__price-note { font-size: .62em; font-weight: 600; line-height: 1.25; }
 .ggm-workshop-booking-card__price-value { font-size: 1.45em; font-weight: 700; line-height: 1.1; }
@@ -1134,13 +1141,15 @@
     font: inherit;
     line-height: 1.25 !important;
     padding: 14px 18px;
+    text-align: center;
 }
 .ggm-workshop-booking-card__button-heading,
 .ggm-workshop-booking-card__button-text { display: block; }
 .ggm-workshop-booking-card__button-heading { font-size: 1em; }
 .ggm-workshop-booking-card__button-text { font-size: .78em; font-weight: 500; margin-top: 3px; }
 .ggm-workshop-booking-card__button:hover,
-.ggm-workshop-booking-card__button:focus { filter: brightness(.92); color: var(--e-global-color-secondary, var(--wp--preset--color--secondary, currentColor)) !important; }
+.ggm-workshop-booking-card__button:focus {    /* filter: brightness(.92); */
+    /* color: var(--e-global-color-secondary, var(--wp--preset--color--secondary, currentColor)) var(--e-global-color-secondary, var(--wp--preset--color--secondary, currentColor)) !important; */ }
 .ggm-workshop-booking-card__testimonial { display: grid; justify-items: center; gap: 4px; padding: 14px 12px; text-align: center; font-size: .8em; line-height: 1.3; }
 .ggm-workshop-booking-card__testimonial > span { display: inline-flex; align-items: center; flex-wrap: wrap; justify-content: center; gap: 6px; }
 .ggm-workshop-booking-card__stars {     letter-spacing: 1px;
@@ -1482,6 +1491,20 @@
   margin-bottom: 1em;
 }
 
+/* One shared main-heading system for Why Different, Why This Workshop Is
+   Different, Journey, and FAQ. */
+.ggm-ws-section-heading {
+  display: block;
+  margin: 0 0 28px;
+  color: inherit;
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 32px;
+  font-style: normal;
+  font-weight: 600;
+  line-height: 38px;
+  text-align: center;
+}
+
 /* Keep every standalone workshop detail in the compact icon-left layout on
  * phones: icon on the left, label and value stacked on the right. */
 
@@ -1621,20 +1644,16 @@
   width: 100%;
   height: auto;
 }
-.ggm-ws-mentors {
-  flex-direction: column;
-}
-
 .ggm-ws-discover__icon {
-  width: 170px;
-  height: 170px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  padding: 5px;
-  overflow: hidden;
+    width: 70px;
+    height: 70px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    padding: 5px;
+    overflow: hidden;
 }
 .ggm-ws-discover__icon img {
   width: 100%;
@@ -1660,9 +1679,9 @@
 }
 
 .ggm-ws-why-different {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 30px;
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 30px;
 }
 
 .ggm-ws-why-different__item {
@@ -1674,6 +1693,7 @@
     flex-direction: column;
     align-items: center;
     gap: 15px;
+    box-shadow: 0px 2px 5px 0px #dcdcdc;
 }
 .ggm-ws-why-different__icon {
   /* width: 130px; */
@@ -1746,16 +1766,15 @@
   gap: 14px;
 }
 .ggm-ws-faq__item {
-  background: rgb(255 255 255);
-  border: 1px solid rgb(20 191 202 / 16%);
-  border-radius: 16px;
-  padding: 0 20px;
-  transition:
-    background 0.2s ease,
-    border-color 0.2s ease;
+    background: rgb(255 255 255);
+    border: 1px solid hsl(91.34deg 57.26% 45.88% / 16%);
+    border-radius: 16px;
+    padding: 0 20px;
+    transition: background 0.2s ease, border-color 0.2s ease;
+    box-shadow: 0 2px 3px #e0e0e0;
 }
 .ggm-ws-faq__item[open] {
-  border-color: rgba(20, 191, 202, 0.55);
+border-color: rgb(114 184 50 / 55%);
 }
 .ggm-ws-faq__question {
   display: flex;
@@ -1781,13 +1800,13 @@
   flex: 1;
 }
 .ggm-ws-faq__toggle {
-  position: relative;
-  flex-shrink: 0;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: #3fcfd4;
-  transition: transform 0.25s ease;
+    position: relative;
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: #72b832;
+    transition: transform 0.25s ease;
 }
 .ggm-ws-faq__toggle::before,
 .ggm-ws-faq__toggle::after {
@@ -1814,10 +1833,10 @@
   opacity: 0;
 }
 .ggm-ws-faq__answer {
-  padding: 0 0 20px;
-  color: #4a5a5c;
-  font-size: 15px;
-  line-height: 1.65;
+    padding: 0 0 20px;
+    color: #4a5a5c;
+    font-size: 16px;
+    line-height: 1.65;
 }
 .ggm-ws-faq__answer p:first-child {
   margin-top: 0;
@@ -2068,6 +2087,38 @@
   min-width: 0;
   width: 100%;
 }
+.ggm-ws-join-form-full__input-wrap {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+}
+.ggm-ws-join-form-full__input-icon {
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  left: 20px;
+  display: block;
+  width: 20px;
+  height: 20px;
+  color: #8793a3;
+  line-height: 0;
+  pointer-events: none;
+  transform: translateY(-50%);
+  transition: color 0.15s ease;
+}
+.ggm-ws-join-form-full__input-icon svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.ggm-ws-join-form-full__input-wrap:focus-within .ggm-ws-join-form-full__input-icon {
+  color: #64748b;
+}
 .ggm-ws-join-form-full .ggm-ws-join-form-full__phone-control {
   display: grid !important;
   grid-template-columns: max-content minmax(0, 1fr);
@@ -2109,6 +2160,10 @@
   -webkit-appearance: none;
   appearance: none;
   transition: border-color 0.15s ease;
+}
+.ggm-ws-join-form-full__input-wrap .ggm-ws-join-form-full__name,
+.ggm-ws-join-form-full__input-wrap .ggm-ws-join-form-full__email {
+  padding-left: 54px;
 }
 .ggm-ws-join-form-full__email {
   width: 100%;
@@ -2374,50 +2429,178 @@
   display: none !important;
 }
 
-.ggm-ws-mentors {
-  display: flex;
-  flex-wrap: nowrap;
-  justify-content: center;
-  gap: 30px;
-  flex-direction: row;
+.ggm-ws-mentor-section,
+.ggm-ws-mentor-section * {
+  box-sizing: border-box;
 }
-.ggm-ws-mentor {
-  max-width: 420px;
+.ggm-ws-mentor-section {
+  width: 100%;
+  max-width: 1120px;
+  margin: 0 auto;
+  color: #172033;
+  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
-.ggm-ws-mentor__avatar {
+.ggm-ws-mentor-section .ggm-ws-mentors {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: stretch;
+  justify-content: initial;
+  gap: 20px;
+  width: 100%;
+}
+.ggm-ws-mentor-section .ggm-ws-mentor {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr);
+  align-items: center;
+  gap: 22px;
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+  min-height: 156px;
+  margin: 0;
+  padding: 21px 24px;
+  border: 1px solid #edf0f3;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 8px 28px rgba(23, 32, 51, 0.08);
+  text-align: left;
+}
+.ggm-ws-mentor-section .ggm-ws-mentor--without-image {
+  grid-template-columns: minmax(0, 1fr);
+}
+.ggm-ws-mentor-section .ggm-ws-mentor__avatar {
   display: block;
-  width: 180px;
-  height: 180px;
-  border: 1px solid #e5e7eb;
-  border-radius: 50%;
+  width: 112px;
+  height: 112px;
+  margin: 0;
   overflow: hidden;
-  margin: 0 auto 24px;
+  border: 0;
+  border-radius: 50%;
+  background: #f2f4f7;
 }
-.ggm-ws-mentor__avatar img {
+.ggm-ws-mentor-section .ggm-ws-mentor__avatar img {
+  display: block;
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: transform 0.35s ease;
+  object-position: center;
+  transition: transform 0.3s ease;
 }
-.ggm-ws-mentor__avatar:hover img {
-  transform: scale(1.15);
+.ggm-ws-mentor-section .ggm-ws-mentor:hover .ggm-ws-mentor__avatar img {
+  transform: scale(1.04);
 }
-.ggm-ws-mentor__name {
-  font-size: 26px;
+.ggm-ws-mentor-section .ggm-ws-mentor__content {
+  min-width: 0;
+}
+.ggm-ws-mentor-section .ggm-ws-mentor__name {
+  margin: 0 0 8px;
+  color: #101828;
+  font-size: 18px;
   font-weight: 700;
-  color: #111827;
-  margin: 0 0 12px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
 }
-.ggm-ws-mentor__bio {
-  font-size: 15px;
-  line-height: 1.7em;
-  color: #374151;
+.ggm-ws-mentor-section .ggm-ws-mentor__bio {
+  color: #4b5565;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
 }
-.ggm-ws-mentor__bio p {
-  margin: 0 0 12px;
+.ggm-ws-mentor-section .ggm-ws-mentor__bio p {
+  margin: 0 0 8px;
 }
-.ggm-ws-mentor__bio p:last-child {
+.ggm-ws-mentor-section .ggm-ws-mentor__bio p:last-child {
   margin-bottom: 0;
+}
+.ggm-ws-mentor-section .ggm-ws-mentor__bio > :first-child {
+  margin-top: 0;
+}
+.ggm-ws-mentor-section .ggm-ws-mentor__bio > :last-child {
+  margin-bottom: 0;
+}
+.ggm-ws-mentor-section .ggm-ws-mentor__bio h1,
+.ggm-ws-mentor-section .ggm-ws-mentor__bio h2,
+.ggm-ws-mentor-section .ggm-ws-mentor__bio h3,
+.ggm-ws-mentor-section .ggm-ws-mentor__bio h4,
+.ggm-ws-mentor-section .ggm-ws-mentor__bio h5,
+.ggm-ws-mentor-section .ggm-ws-mentor__bio h6 {
+  margin: 12px 0 6px;
+  color: #101828;
+  font: inherit;
+  font-weight: 700;
+  line-height: 1.3;
+}
+.ggm-ws-mentor-section .ggm-ws-mentor__bio ul,
+.ggm-ws-mentor-section .ggm-ws-mentor__bio ol {
+  margin: 8px 0;
+  padding-left: 1.4em;
+}
+.ggm-ws-mentor-section .ggm-ws-mentor__bio ul {
+  list-style: disc outside;
+}
+.ggm-ws-mentor-section .ggm-ws-mentor__bio ol {
+  list-style: decimal outside;
+}
+.ggm-ws-mentor-section .ggm-ws-mentor__bio li {
+  margin: 0 0 4px;
+}
+.ggm-ws-mentor-section .ggm-ws-mentor__bio blockquote {
+  margin: 10px 0;
+  padding: 2px 0 2px 12px;
+  border-left: 3px solid #d8dee8;
+  color: #5f6b7c;
+  font-style: italic;
+}
+.ggm-ws-mentor-section .ggm-ws-mentor__bio a {
+  color: #1d5f9c;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.ggm-ws-mentor-section .ggm-ws-mentor__bio .alignleft {
+  text-align: left;
+}
+.ggm-ws-mentor-section .ggm-ws-mentor__bio .aligncenter {
+  text-align: center;
+}
+.ggm-ws-mentor-section .ggm-ws-mentor__bio .alignright {
+  text-align: right;
+}
+.ggm-ws-mentor-section .ggm-ws-mentor__bio strong,
+.ggm-ws-mentor-section .ggm-ws-mentor__bio b {
+  font-weight: 700;
+}
+.ggm-ws-mentor-section .ggm-ws-mentor__bio em,
+.ggm-ws-mentor-section .ggm-ws-mentor__bio i {
+  font-style: italic;
+}
+@media (max-width: 600px) {
+  .ggm-ws-mentor-section .ggm-ws-mentors {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 14px;
+  }
+  .ggm-ws-mentor-section .ggm-ws-mentor {
+    grid-template-columns: 88px minmax(0, 1fr);
+    gap: 16px;
+    min-height: 120px;
+    padding: 16px;
+    text-align: left;
+  }
+  .ggm-ws-mentor-section .ggm-ws-mentor--without-image {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .ggm-ws-mentor-section .ggm-ws-mentor__avatar {
+    width: 88px;
+    height: 88px;
+    margin: 0;
+  }
+  .ggm-ws-mentor-section .ggm-ws-mentor__name {
+    font-size: 17px;
+  }
+  .ggm-ws-mentor-section .ggm-ws-mentor__bio {
+    font-size: 13px;
+    line-height: 1.5;
+  }
 }
 
 .ggm-login-redirect {
@@ -2680,29 +2863,33 @@
 }
 
 @media (max-width: 767px) {
-  /* Elementor sometimes carries a desktop fixed/min-height onto the mobile
-	   container that directly owns a Shortcode widget. That makes a small
-	   shortcode occupy a tall, mostly empty colour block. Keep the reset
-	   scoped to direct shortcode containers so intentional page sections are
-	   left alone. */
-  .e-con:has(.elementor-widget-shortcode),
-  .e-con:has(.elementor-widget-shortcode) > .e-con,
-  .elementor-section:has(
-    > .elementor-container
-      > .elementor-column
-      > .elementor-widget-wrap
-      > .elementor-widget-shortcode
-  ),
-  .elementor-column:has(
-    > .elementor-widget-wrap > .elementor-widget-shortcode
-  ) {
+  /* Release a page-builder min-height only when it owns the opted-in health
+     checkout. Other shortcodes and forms retain their configured sections. */
+  .e-con:has(.ggm-form-theme-health-checkout),
+  .elementor-section:has(.ggm-form-theme-health-checkout),
+  .elementor-column:has(.ggm-form-theme-health-checkout) {
     height: auto !important;
     min-height: 0 !important;
   }
-  .elementor-widget-shortcode,
-  .elementor-widget-shortcode > .elementor-widget-container {
+  .elementor-widget-shortcode:has(.ggm-form-theme-health-checkout),
+  .elementor-widget-shortcode:has(.ggm-form-theme-health-checkout) > .elementor-widget-container,
+  .elementor-widget-shortcode:has(.ggm-form-theme-health-checkout) > .elementor-shortcode,
+  .elementor-shortcode:has(> .ggm-form-theme-health-checkout) {
     height: auto !important;
+    block-size: auto !important;
     min-height: 0 !important;
+    min-block-size: 0 !important;
+    max-height: none !important;
+  }
+  .elementor-widget-shortcode:has(.ggm-form-theme-health-checkout),
+  .elementor-shortcode:has(> .ggm-form-theme-health-checkout) {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: fit-content !important;
+    block-size: fit-content !important;
+    align-self: auto !important;
+    flex-grow: 0 !important;
+    flex-basis: auto !important;
   }
   .ggm-ws-discover__item > div {
     min-width: 0;
@@ -2720,19 +2907,6 @@
     width: min(100%, 280px) !important;
     height: auto !important;
     aspect-ratio: 9 / 7;
-  }
-  .ggm-ws-mentors {
-    flex-flow: column nowrap !important;
-    align-items: center !important;
-  }
-  .ggm-ws-mentor {
-    width: 100% !important;
-    max-width: 520px !important;
-    text-align: center;
-  }
-  .ggm-ws-mentor__avatar {
-    width: 160px !important;
-    height: 160px !important;
   }
 }
 
@@ -2788,19 +2962,6 @@
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 30px;
-  }
-  .ggm-ws-mentors {
-    flex-flow: column nowrap !important;
-    align-items: center !important;
-  }
-  .ggm-ws-mentor {
-    width: 100% !important;
-    max-width: 520px !important;
-    text-align: center;
-  }
-  .ggm-ws-mentor__avatar {
-    width: 160px !important;
-    height: 160px !important;
   }
   .ggm-ws-join-form,
   .ggm-ws-join-form-full,
@@ -3015,19 +3176,23 @@
 /* Why {Workshop Name} is Different shortcode: structure is independent of
    the reference palette and inherits the website's colour tokens. */
 .ggm-ws-why-workshop-different {
-  box-sizing: border-box;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(220px, .9fr);
-  align-items: center;
-  gap: clamp(28px, 6vw, 78px);
-  width: 100%;
-  padding: clamp(28px, 5vw, 64px);
+    box-sizing: border-box;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(220px, .9fr);
+    align-items: center;
+    gap: clamp(28px, 6vw, 78px);
+    width: 100%;
 }
-.ggm-ws-why-workshop-different__heading { margin: 0 0 16px; color: inherit; font-size: clamp(26px, 3vw, 42px); line-height: 1.12; }
 .ggm-ws-why-workshop-different__intro { margin: 0 0 20px; color: inherit; line-height: 1.6; }
 .ggm-ws-why-workshop-different__points { display: grid; gap: 11px; margin: 0; padding: 0; list-style: none; }
 .ggm-ws-why-workshop-different__points li { display: flex; align-items: flex-start; gap: 10px; color: inherit; line-height: 1.45; }
-.ggm-ws-why-workshop-different__points svg { flex: 0 0 20px; width: 20px; height: 20px; margin-top: 1px; fill: none; stroke: currentColor; stroke-width: 1.8; }
+.ggm-ws-why-workshop-different__points svg {     flex: 0 0 20px;
+    width: 20px;
+    height: 20px;
+    margin-top: 1px;
+    fill: none;
+    stroke: var(--superwoo-review-accent);
+    stroke-width: 1.8; }
 .ggm-ws-why-workshop-different__media { min-width: 0; }
 .ggm-ws-why-workshop-different__media img { display: block; width: 100%; height: auto; object-fit: contain; }
 @media (max-width: 767px) {
@@ -3037,16 +3202,15 @@
 
 /* Workshop Journey shortcode — soft cards along a connected timeline. */
 .ggm-ws-journey {
-  --ggm-journey-gap: 16px;
-  --ggm-journey-marker: 68px;
-  --ggm-journey-line: #eddfd9;
-  box-sizing: border-box;
-  width: 100%;
+    --ggm-journey-gap: 16px;
+    --ggm-journey-marker: 68px;
+    --ggm-journey-line: #dceabe;
+    box-sizing: border-box;
+    width: 100%;
 }
 .ggm-ws-journey *,
 .ggm-ws-journey *::before,
 .ggm-ws-journey *::after { box-sizing: border-box; }
-.ggm-ws-journey__heading { margin: 0 0 28px; color: inherit; text-align: center; }
 .ggm-ws-journey__viewport { overflow: hidden; }
 .ggm-ws-journey__track { display: flex; transition: transform .28s ease; }
 .ggm-ws-journey__page {
@@ -3080,40 +3244,43 @@
   content: '';
 }
 .ggm-ws-journey__marker {
-  position: relative;
-  z-index: 1;
-  display: grid;
-  flex: 0 0 auto;
-  place-items: center;
-  width: var(--ggm-journey-marker);
-  height: var(--ggm-journey-marker);
-  margin: 0 auto 10px;
-  padding: 13px;
-  overflow: hidden;
-  border: 2px solid #eee0d8;
-  border-radius: 50%;
-  background: #fcf5ef;
-  color: #a16b7b;
-  box-shadow: 0 2px 5px rgb(95 64 52 / 5%);
+    position: relative;
+    z-index: 1;
+    display: grid;
+    flex: 0 0 auto;
+    place-items: center;
+    width: var(--ggm-journey-marker);
+    height: var(--ggm-journey-marker);
+    margin: 0 auto 10px;
+    padding: 10px;
+    overflow: hidden;
+    border: 2px solid #dceabe;
+    border-radius: 50%;
+    background: #ffffff;
+    box-shadow: 0 2px 5px rgb(95 64 52 / 5%);
 }
 .ggm-ws-journey__marker img { display: block; width: 100%; height: 100%; object-fit: contain; }
 .ggm-ws-journey__marker > span { font-size: 13px; font-weight: 700; line-height: 1.2; }
 .ggm-ws-journey__card {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  min-height: 136px;
-  padding: 20px 12px;
-  border: 1px solid #f2e9e4;
-  border-radius: 16px;
-  background: linear-gradient(145deg, #fffdfb, #fcf7f4);
-  color: #393231;
-  box-shadow: 0 6px 12px rgb(95 64 52 / 8%), 0 1px 3px rgb(95 64 52 / 4%);
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 10px;
+    border: 1px solid #ecf1dd;
+    border-radius: 16px;
+    background: linear-gradient(145deg, #ecf1dd, #f4fff8);
+    color: #393231;
+    box-shadow: 0 2px 7px rgb(95 64 52 / 8%), 0 1px 3px rgb(95 64 52 / 4%);
 }
-.ggm-ws-journey__card strong { font-size: clamp(18px, 1.4vw, 24px); font-weight: 700; line-height: 1.25; }
-.ggm-ws-journey__card span { max-width: 19ch; font-size: clamp(14px, 1.12vw, 19px); font-weight: 500; line-height: 1.5; text-wrap: pretty; }
+.ggm-ws-journey__card strong { font-size: 18px;
+    font-weight: 600;
+    line-height: 1.25; }
+.ggm-ws-journey__card span {  font-size: 14px;
+    font-weight: 500;
+    line-height: 1.4;
+    text-wrap: pretty; }
 .ggm-ws-journey__nav { display: flex; justify-content: center; gap: 10px; margin-top: 18px; }
 .ggm-ws-journey__arrow { display: inline-grid; place-items: center; width: 38px; height: 38px; padding: 0; border: 1px solid currentColor; border-radius: 50%; background: transparent; color: inherit; cursor: pointer; font: inherit; font-size: 20px; }
 .ggm-ws-journey__arrow:disabled { cursor: default; opacity: .4; }
@@ -3391,27 +3558,60 @@
   }
 }
 
+/* Approved mobile typography and Discover grid overrides. Keep this block
+   after the legacy/custom layout rules so phones have a predictable result
+   while every desktop declaration remains unchanged. */
 @media (max-width: 767px) {
-  .ggm-ws-mentors {
+  .ggm-workshop-booking-card__hero-header,
+  .ggm-workshop-booking-card__hero-header *,
+  .ggm-workshop-heading,
+  .ggm-ws-block .ggm-ws-block__heading,
+  .ggm-ws-section-heading,
+  .ggm-built-form > .ggm-form-title {
+    font-family: "Space Grotesk", sans-serif !important;
+    font-size: 25px !important;
+    font-style: normal !important;
+    font-weight: 600 !important;
+    line-height: 28px !important;
+  }
+
+  .ggm-ws-block--discover .ggm-ws-discover,
+  .ggm-ws-block--discover .ggm-ws-discover.ggm-ws-layout--custom {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 16px 12px;
+    width: 100%;
+  }
+
+  .ggm-ws-block--discover .ggm-ws-discover__item {
+    display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 36px;
-  }
-  .ggm-ws-mentor {
+    gap: 10px;
     width: 100%;
-    max-width: 520px;
-    text-align: center;
+    min-width: 0;
   }
-  .ggm-ws-mentor__avatar {
-    width: 160px;
-    height: 160px;
-    margin-bottom: 18px;
+
+  .ggm-ws-block--discover .ggm-ws-discover__item > div {
+    width: 100%;
+    min-width: 0;
   }
-  .ggm-ws-mentor__name {
-    font-size: 22px;
+
+  .ggm-ws-block--discover .ggm-ws-discover__heading {
+    font-size: 16px;
+    line-height: 1.3;
+    overflow-wrap: anywhere;
   }
-  .ggm-ws-mentor__bio {
-    font-size: 15px;
-    line-height: 1.6em;
+
+  .ggm-ws-block--why-different .ggm-ws-why-different__title {
+    font-size: 16px;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+  }
+
+  .ggm-ws-journey__card strong {
+    font-size: 16px;
+    line-height: 1.3;
+    overflow-wrap: anywhere;
   }
 }

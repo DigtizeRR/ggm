@@ -36,7 +36,7 @@ $login_url     = $login_page_id ? get_permalink( $login_page_id ) : home_url( '/
 		<input type="email" id="ggm-signup-email" placeholder="<?php esc_attr_e( 'Email address', 'ggm-member-dashboard' ); ?>">
 		<div class="ggm-global-phone-control">
 			<?php echo class_exists( 'GGM_Form_Builder' ) ? GGM_Form_Builder::country_picker_html( 'country_code', 'ggm-signup-country-code', '+91' ) : '<input type="hidden" id="ggm-signup-country-code" value="+91">'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
-			<input type="tel" id="ggm-signup-phone" placeholder="<?php esc_attr_e( 'Phone number (optional)', 'ggm-member-dashboard' ); ?>" inputmode="tel" autocomplete="tel-national">
+			<input type="tel" id="ggm-signup-phone" placeholder="<?php esc_attr_e( 'Phone number (optional)', 'ggm-member-dashboard' ); ?>" inputmode="tel" autocomplete="tel-national" maxlength="15">
 		</div>
 		<input type="password" id="ggm-signup-password" placeholder="<?php esc_attr_e( 'Password', 'ggm-member-dashboard' ); ?>">
 		<input type="password" id="ggm-signup-confirm-password" placeholder="<?php esc_attr_e( 'Confirm password', 'ggm-member-dashboard' ); ?>">

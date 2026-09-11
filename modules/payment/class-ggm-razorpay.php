@@ -78,10 +78,11 @@ class GGM_Razorpay {
 			wp_send_json_error( array( 'message' => __( 'Your session has expired. Please refresh the page and try again.', 'ggm-member-dashboard' ) ) );
 		}
 
-		$phone = preg_replace( '/\D/', '', wp_unslash( $_POST['contact_phone'] ?? '' ) );
-		$email = sanitize_email( wp_unslash( $_POST['contact_email'] ?? '' ) );
-		$name  = sanitize_text_field( wp_unslash( $_POST['contact_name'] ?? '' ) );
-		if ( strlen( $phone ) < 10 || ! is_email( $email ) || '' === $name ) {
+		$country_code = sanitize_text_field( wp_unslash( $_POST['contact_country_code'] ?? '+91' ) );
+		$phone        = ggm_normalize_member_phone( wp_unslash( $_POST['contact_phone'] ?? '' ), $country_code );
+		$email        = sanitize_email( wp_unslash( $_POST['contact_email'] ?? '' ) );
+		$name         = sanitize_text_field( wp_unslash( $_POST['contact_name'] ?? '' ) );
+		if ( '' === $phone || ! is_email( $email ) || '' === $name ) {
 			wp_send_json_error( array( 'message' => __( 'Please enter valid contact details to proceed.', 'ggm-member-dashboard' ) ) );
 		}
 
@@ -131,6 +132,8 @@ class GGM_Razorpay {
 			'last_name'    => $parts[1] ?? '',
 		) );
 		update_user_meta( $user_id, 'ggm_phone', $phone );
+		update_user_meta( $user_id, 'billing_phone', $phone );
+		update_user_meta( $user_id, 'ggm_whatsapp_country_code', $country_code );
 		update_user_meta( $user_id, 'ggm_checkout_email', $email );
 		wp_set_current_user( $user_id );
 		wp_set_auth_cookie( $user_id, true );
@@ -167,7 +170,7 @@ class GGM_Razorpay {
 			$contact['email'] = ( $checkout_email && '@guest.invalid' === substr( $user->user_email, -14 ) )
 				? $checkout_email
 				: $user->user_email;
-			$contact['phone'] = get_user_meta( $user->ID, 'ggm_phone', true ) ?: get_user_meta( $user->ID, 'billing_phone', true );
+			$contact['phone'] = ggm_get_member_phone( $user->ID );
 		}
 
 		wp_send_json_success( array(
@@ -213,7 +216,9 @@ class GGM_Razorpay {
 		}
 
 		// Validate inputs based on the configured method
-		$has_valid_phone = strlen( $phone ) >= 10;
+		$phone_identity  = class_exists( 'GGM_OTP' ) ? GGM_OTP::normalize_identifier( $phone ) : false;
+		$normalized_phone_input = is_array( $phone_identity ) && ! empty( $phone_identity['is_phone'] ) ? $phone_identity['clean_id'] : '';
+		$has_valid_phone = '' !== $normalized_phone_input;
 		$has_valid_email = is_email( $email );
 
 		// For 'phone' mode: require valid phone
@@ -246,7 +251,7 @@ class GGM_Razorpay {
 
 			if ( $has_valid_phone ) {
 				// Normalize phone to 10-digit canonical form before lookup
-				$normalized_phone = GGM_Auth::normalize_phone( $phone );
+				$normalized_phone = $normalized_phone_input;
 				if ( $normalized_phone ) {
 					$phone_user = GGM_Auth::find_user_by_phone( $normalized_phone );
 				}
@@ -345,6 +350,9 @@ class GGM_Razorpay {
 	public function create_order( $amount, $currency = 'INR', $receipt_id = '' ) {
 		$key_id     = $this->get_key_id();
 		$key_secret = $this->get_key_secret();
+		$currency   = class_exists( 'GGM_Currency' )
+			? GGM_Currency::normalize_code( $currency, GGM_Currency::base_currency() )
+			: ( preg_match( '/^[A-Z]{3}$/', strtoupper( trim( (string) $currency ) ) ) ? strtoupper( trim( (string) $currency ) ) : 'INR' );
 
 		if ( empty( $key_id ) || empty( $key_secret ) ) {
 			return new WP_Error( 'no_keys', __( 'Razorpay API keys are not configured.', 'ggm-member-dashboard' ) );
@@ -491,7 +499,9 @@ class GGM_Razorpay {
 			return GGM_Currency::selected_currency();
 		}
 
-		return strtoupper( sanitize_text_field( ggm_get_setting( 'ggm_currency', 'INR' ) ) );
+		return class_exists( 'GGM_Currency' )
+			? GGM_Currency::base_currency()
+			: ( preg_match( '/^[A-Z]{3}$/', strtoupper( trim( (string) ggm_get_setting( 'ggm_currency', 'INR' ) ) ) ) ? strtoupper( trim( (string) ggm_get_setting( 'ggm_currency', 'INR' ) ) ) : 'INR' );
 	}
 
 	private function display_amount( $base_amount, $currency, $item_id, $include_adjustment = true ) {
@@ -673,12 +683,15 @@ class GGM_Razorpay {
 		$contact_phone = sanitize_text_field( wp_unslash( $_POST['contact_phone'] ?? '' ) );
 		$contact_email = sanitize_email( wp_unslash( $_POST['contact_email'] ?? '' ) );
 		$country_code  = sanitize_text_field( wp_unslash( $_POST['contact_country_code'] ?? '+91' ) );
+		$clean_phone   = '' !== $contact_phone ? ggm_normalize_member_phone( $contact_phone, $country_code ) : '';
+		if ( '' !== $contact_phone && '' === $clean_phone ) {
+			wp_send_json_error( array( 'message' => __( 'Please enter a valid phone number for the selected country.', 'ggm-member-dashboard' ) ) );
+		}
 		if ( is_email( $contact_email ) ) {
 			update_user_meta( $user_id, 'ggm_checkout_email', $contact_email );
 			update_user_meta( $user_id, 'billing_email', $contact_email );
 		}
 		if ( '' !== $contact_phone ) {
-			$clean_phone = preg_replace( '/\D/', '', $contact_phone );
 			if ( '' !== $clean_phone ) {
 				update_user_meta( $user_id, 'billing_phone', $clean_phone );
 				update_user_meta( $user_id, 'ggm_phone', $clean_phone );

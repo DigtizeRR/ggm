@@ -300,7 +300,7 @@ class GGM_REST_API {
 			'last_name'    => $user->last_name,
 			'email'        => $user->user_email,
 			'display_name' => $user->display_name,
-			'phone'        => get_user_meta( $user->ID, 'ggm_phone', true ),
+			'phone'        => ggm_get_member_phone( $user->ID ),
 			'country_code' => get_user_meta( $user->ID, 'ggm_whatsapp_country_code', true ) ?: '+91',
 		) );
 	}
@@ -311,6 +311,10 @@ class GGM_REST_API {
 		$last_name    = sanitize_text_field( $req->get_param( 'last_name' ) ?? '' );
 		$phone        = sanitize_text_field( $req->get_param( 'phone' ) ?? '' );
 		$country_code = sanitize_text_field( $req->get_param( 'country_code' ) ?? '' );
+		$clean_phone  = '' !== $phone ? ggm_normalize_member_phone( $phone, $country_code ?: '+91' ) : '';
+		if ( '' !== $phone && '' === $clean_phone ) {
+			return new WP_Error( 'ggm_invalid_phone', __( 'Please enter a valid phone number for the selected country.', 'ggm-member-dashboard' ), array( 'status' => 400 ) );
+		}
 
 		wp_update_user( array(
 			'ID'           => $user_id,
@@ -320,9 +324,8 @@ class GGM_REST_API {
 		) );
 
 		if ( $phone ) {
-			$clean = preg_replace( '/\D/', '', $phone );
-			update_user_meta( $user_id, 'ggm_phone', $clean );
-			update_user_meta( $user_id, 'billing_phone', $clean );
+			update_user_meta( $user_id, 'ggm_phone', $clean_phone );
+			update_user_meta( $user_id, 'billing_phone', $clean_phone );
 		}
 
 		if ( $country_code ) {

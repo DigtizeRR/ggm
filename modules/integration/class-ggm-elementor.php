@@ -89,7 +89,7 @@ class GGM_Elementor {
 			return $content;
 		}
 
-		$workshop_id = $this->resolve_current_workshop_id();
+		$workshop_id = self::resolve_current_workshop_id();
 		if ( ! $workshop_id || ggm_sanitize_youtube_url( get_post_meta( $workshop_id, 'ggm_workshop_featured_video_url', true ) ) || ! has_post_thumbnail( $workshop_id ) ) {
 			return $content;
 		}
@@ -142,7 +142,7 @@ class GGM_Elementor {
 	 *
 	 * @return int
 	 */
-	private function resolve_current_workshop_id() {
+	public static function resolve_current_workshop_id() {
 		$candidates = array( get_the_ID(), get_queried_object_id() );
 
 		if (
@@ -208,12 +208,18 @@ class GGM_Elementor {
 		);
 
 		require_once GGM_PLUGIN_DIR . 'modules/integration/elementor/class-ggm-elementor-workshop-video-tag.php';
+		if ( class_exists( '\Elementor\Core\DynamicTags\Data_Tag' ) ) {
+			require_once GGM_PLUGIN_DIR . 'modules/integration/elementor/class-ggm-elementor-workshop-bottom-image-tag.php';
+		}
 		require_once GGM_PLUGIN_DIR . 'modules/integration/elementor/class-ggm-elementor-workshop-heading-tags.php';
 		require_once GGM_PLUGIN_DIR . 'modules/integration/elementor/class-ggm-elementor-form-popup-tag.php';
 		require_once GGM_PLUGIN_DIR . 'modules/integration/elementor/class-ggm-elementor-blog-video-tag.php';
 
 		if ( class_exists( 'GGM_Elementor_Workshop_Video_Tag' ) ) {
 			$dynamic_tags_manager->register( new GGM_Elementor_Workshop_Video_Tag() );
+		}
+		if ( class_exists( 'GGM_Elementor_Workshop_Bottom_Image_Tag' ) ) {
+			$dynamic_tags_manager->register( new GGM_Elementor_Workshop_Bottom_Image_Tag() );
 		}
 		if ( class_exists( 'GGM_Elementor_Blog_Video_Tag' ) ) {
 			$dynamic_tags_manager->register( new GGM_Elementor_Blog_Video_Tag() );

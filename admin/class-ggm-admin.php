@@ -1473,7 +1473,7 @@ class GGM_Admin {
 			wp_send_json_error( array( 'message' => __( 'User not found.', 'ggm-member-dashboard' ) ) );
 		}
 
-		$phone      = get_user_meta( $user_id, 'billing_phone', true ) ?: get_user_meta( $user_id, 'ggm_phone', true );
+		$phone      = ggm_get_member_phone( $user_id );
 		$avatar_url = get_user_meta( $user_id, 'ggm_avatar_url', true ) ?: get_avatar_url( $user_id, array( 'size' => 64 ) );
 		$member_fields = array(
 			__( 'Address', 'ggm-member-dashboard' )         => get_user_meta( $user_id, 'ggm_full_address', true ),
@@ -1662,13 +1662,16 @@ class GGM_Admin {
 		$name      = sanitize_text_field( wp_unslash( $_POST['name'] ?? '' ) );
 		$email     = sanitize_email( wp_unslash( $_POST['email'] ?? '' ) );
 		$phone_raw = sanitize_text_field( wp_unslash( $_POST['phone'] ?? '' ) );
-		$phone     = preg_replace( '/\D/', '', $phone_raw );
+		$phone     = '' !== $phone_raw ? ggm_normalize_member_phone( $phone_raw, '+91' ) : '';
 
 		if ( '' === $name ) {
 			wp_send_json_error( array( 'message' => __( 'Please enter the member name.', 'ggm-member-dashboard' ) ) );
 		}
 		if ( ! is_email( $email ) ) {
 			wp_send_json_error( array( 'message' => __( 'Please enter a valid email address.', 'ggm-member-dashboard' ) ) );
+		}
+		if ( '' !== $phone_raw && '' === $phone ) {
+			wp_send_json_error( array( 'message' => __( 'Please enter a valid 10-digit Indian mobile number.', 'ggm-member-dashboard' ) ) );
 		}
 		if ( email_exists( $email ) ) {
 			wp_send_json_error( array( 'message' => __( 'That email already belongs to a WordPress user. Use the WordPress User tab instead.', 'ggm-member-dashboard' ) ) );

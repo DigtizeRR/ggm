@@ -32,13 +32,35 @@ class GGM_Currency {
 		);
 	}
 
+	/**
+	 * Return a currency code that is supported by this plugin.
+	 *
+	 * Currency values can originate in old free-text settings. Normalising at
+	 * the boundary prevents symbols and stale labels from reaching a payment
+	 * gateway as though they were ISO currency codes.
+	 *
+	 * @param mixed  $currency Currency value to validate.
+	 * @param string $fallback Supported fallback code.
+	 * @return string
+	 */
+	public static function normalize_code( $currency, $fallback = 'INR' ) {
+		$known    = self::currencies();
+		$currency = strtoupper( trim( sanitize_text_field( (string) $currency ) ) );
+		$fallback = strtoupper( trim( sanitize_text_field( (string) $fallback ) ) );
+
+		if ( isset( $known[ $currency ] ) ) {
+			return $currency;
+		}
+
+		return isset( $known[ $fallback ] ) ? $fallback : 'INR';
+	}
+
 	public static function is_enabled() {
 		return ! empty( get_option( 'ggm_settings', array() )['ggm_multicurrency_enabled'] );
 	}
 
 	public static function base_currency() {
-		$base = strtoupper( sanitize_text_field( ggm_get_setting( 'ggm_currency', 'INR' ) ) );
-		return isset( self::currencies()[ $base ] ) ? $base : 'INR';
+		return self::normalize_code( ggm_get_setting( 'ggm_currency', 'INR' ) );
 	}
 
 	public static function default_currency() {

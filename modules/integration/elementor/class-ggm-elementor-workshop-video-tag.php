@@ -35,7 +35,7 @@ class GGM_Elementor_Workshop_Video_Tag extends \Elementor\Core\DynamicTags\Tag {
 	 * Print the normalized YouTube URL expected by Elementor's Video control.
 	 */
 	public function render(): void {
-		$workshop_id = $this->resolve_workshop_id();
+		$workshop_id = class_exists( 'GGM_Elementor' ) ? GGM_Elementor::resolve_current_workshop_id() : 0;
 		if ( ! $workshop_id ) {
 			return;
 		}
@@ -44,46 +44,5 @@ class GGM_Elementor_Workshop_Video_Tag extends \Elementor\Core\DynamicTags\Tag {
 		if ( $url ) {
 			echo esc_url( $url );
 		}
-	}
-
-	/**
-	 * Resolve the workshop represented by a singular, loop, or editor context.
-	 *
-	 * @return int
-	 */
-	private function resolve_workshop_id() {
-		$candidates = array( get_the_ID(), get_queried_object_id() );
-
-		if (
-			class_exists( '\Elementor\Plugin' )
-			&& isset( \Elementor\Plugin::$instance )
-			&& isset( \Elementor\Plugin::$instance->documents )
-			&& method_exists( \Elementor\Plugin::$instance->documents, 'get_current' )
-		) {
-			$document = \Elementor\Plugin::$instance->documents->get_current();
-			if ( $document && method_exists( $document, 'get_main_id' ) ) {
-				$candidates[] = $document->get_main_id();
-			}
-		}
-
-		$is_elementor_preview = false;
-		if ( class_exists( '\Elementor\Plugin' ) && isset( \Elementor\Plugin::$instance ) ) {
-			$editor = \Elementor\Plugin::$instance->editor ?? null;
-			$preview = \Elementor\Plugin::$instance->preview ?? null;
-			$is_elementor_preview = ( $editor && method_exists( $editor, 'is_edit_mode' ) && $editor->is_edit_mode() )
-				|| ( $preview && method_exists( $preview, 'is_preview_mode' ) && $preview->is_preview_mode() );
-		}
-
-		foreach ( array_unique( array_filter( array_map( 'absint', $candidates ) ) ) as $post_id ) {
-			if ( ! in_array( get_post_type( $post_id ), array( 'workshop', 'ggm_workshop' ), true ) ) {
-				continue;
-			}
-
-			if ( 'publish' === get_post_status( $post_id ) || ( $is_elementor_preview && current_user_can( 'edit_post', $post_id ) ) ) {
-				return $post_id;
-			}
-		}
-
-		return 0;
 	}
 }

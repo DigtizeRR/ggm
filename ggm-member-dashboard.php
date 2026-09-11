@@ -3,7 +3,7 @@
  * Plugin Name: Digtize LMS System
  * Plugin URI:  https://digtize.com/
  * Description: Complete private member dashboard for Global Good Health Mission with OTP authentication and a fully standalone membership, coupon, and workshop system.
- * Version:     1.1.6
+ * Version:     1.1.8
  * Author:      Rakesh Raushan
  * Author URI:  https://digtize.com/
  * License:     GPL v2 or later
@@ -20,7 +20,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
-define( 'GGM_VERSION',       '1.1.6' );
+define( 'GGM_VERSION',       '1.1.8' );
 define( 'GGM_DB_VERSION',    '3.3.0' );
 define( 'GGM_PLUGIN_FILE',   __FILE__ );
 define( 'GGM_PLUGIN_DIR',    plugin_dir_path( __FILE__ ) );
@@ -153,6 +153,41 @@ function ggm_run() {
 add_action( 'plugins_loaded', 'ggm_run' );
 add_action( 'ggm_cleanup_otp_claim', array( 'GGM_OTP', 'cleanup_claim' ) );
 
+/** Run the recoverable legacy phone cleanup once from an administrator request. */
+function ggm_maybe_repair_legacy_member_phones() {
+	$page = sanitize_key( wp_unslash( $_GET['page'] ?? '' ) );
+	if ( 'ggm-lms-users' !== $page || ! current_user_can( 'manage_options' ) || get_option( 'ggm_phone_integrity_repair_v1' ) ) {
+		return;
+	}
+	$summary = ggm_repair_legacy_member_phones();
+	set_transient( 'ggm_phone_integrity_notice_' . get_current_user_id(), $summary, DAY_IN_SECONDS );
+}
+add_action( 'admin_init', 'ggm_maybe_repair_legacy_member_phones', 20 );
+
+/** Show the one-time result of the recoverable phone cleanup. */
+function ggm_legacy_member_phone_repair_notice() {
+	$key     = 'ggm_phone_integrity_notice_' . get_current_user_id();
+	$summary = get_transient( $key );
+	if ( ! is_array( $summary ) ) {
+		return;
+	}
+	delete_transient( $key );
+	?>
+	<div class="notice notice-info is-dismissible"><p>
+		<?php
+		echo esc_html( sprintf(
+			/* translators: 1: repaired corrupt values, 2: canonicalized values, 3: ambiguous values left unchanged. */
+			__( 'Member phone audit complete: %1$d malformed value(s) repaired, %2$d value(s) canonicalized, and %3$d ambiguous value(s) left unchanged for manual review. Original changed values were backed up.', 'ggm-member-dashboard' ),
+			(int) ( $summary['repaired'] ?? 0 ),
+			(int) ( $summary['canonicalized'] ?? 0 ),
+			(int) ( $summary['ambiguous'] ?? 0 )
+		) );
+		?>
+	</p></div>
+	<?php
+}
+add_action( 'admin_notices', 'ggm_legacy_member_phone_repair_notice' );
+
 /**
  * Download the complete Members list as CSV. The optional search value uses
  * the same name/username/email/phone filter as DZ LMS → Members.
@@ -164,12 +199,26 @@ function ggm_export_members_csv() {
 	check_admin_referer( 'ggm_export_members' );
 
 	global $wpdb;
-	$search = sanitize_text_field( wp_unslash( $_GET['s'] ?? '' ) );
+	$search      = sanitize_text_field( wp_unslash( $_GET['s'] ?? '' ) );
+	$workshop_id = absint( $_GET['workshop_id'] ?? 0 );
+	if ( $workshop_id && ! in_array( get_post_type( $workshop_id ), array( 'workshop', 'ggm_workshop' ), true ) ) {
+		$workshop_id = 0;
+	}
 	$workshop_access = $wpdb->prefix . 'ggm_workshop_access';
 	$course_access   = $wpdb->prefix . 'ggm_course_access';
 	$payments_table  = $wpdb->prefix . 'ggm_payments';
 	$params          = array();
 	$search_sql      = '';
+	$scope_sql       = "(
+		EXISTS (SELECT 1 FROM {$workshop_access} wa2 WHERE wa2.user_id=u.ID)
+		OR EXISTS (SELECT 1 FROM {$course_access} ca2 WHERE ca2.user_id=u.ID)
+		OR EXISTS (SELECT 1 FROM {$wpdb->usermeta} gm WHERE gm.user_id=u.ID AND gm.meta_key='ggm_phone')
+		OR EXISTS (SELECT 1 FROM {$wpdb->usermeta} mm WHERE mm.user_id=u.ID AND mm.meta_key='ggm_member')
+	)";
+	if ( $workshop_id ) {
+		$scope_sql = "EXISTS (SELECT 1 FROM {$workshop_access} wa2 WHERE wa2.user_id=u.ID AND wa2.workshop_id=%d)";
+		$params[]  = $workshop_id;
+	}
 
 	if ( '' !== $search ) {
 		$like       = '%' . $wpdb->esc_like( $search ) . '%';
@@ -177,19 +226,16 @@ function ggm_export_members_csv() {
 			SELECT 1 FROM {$wpdb->usermeta} sm
 			WHERE sm.user_id = u.ID AND sm.meta_key IN ('ggm_phone','billing_phone') AND sm.meta_value LIKE %s
 		))";
-		$params = array( $like, $like, $like, $like );
+		$params = array_merge( $params, array( $like, $like, $like, $like ) );
 	}
 
 	$sql = "SELECT u.ID, u.display_name, u.user_login, u.user_email, u.user_registered,
-		COALESCE((SELECT MAX(pm.meta_value) FROM {$wpdb->usermeta} pm WHERE pm.user_id=u.ID AND pm.meta_key IN ('ggm_phone','billing_phone')), '') AS phone,
+		COALESCE((SELECT pm.meta_value FROM {$wpdb->usermeta} pm WHERE pm.user_id=u.ID AND pm.meta_key='ggm_phone' ORDER BY pm.umeta_id DESC LIMIT 1), '') AS ggm_phone,
+		COALESCE((SELECT bm.meta_value FROM {$wpdb->usermeta} bm WHERE bm.user_id=u.ID AND bm.meta_key='billing_phone' ORDER BY bm.umeta_id DESC LIMIT 1), '') AS billing_phone,
+		COALESCE((SELECT cm.meta_value FROM {$wpdb->usermeta} cm WHERE cm.user_id=u.ID AND cm.meta_key='ggm_whatsapp_country_code' ORDER BY cm.umeta_id DESC LIMIT 1), '+91') AS country_code,
 		(SELECT COUNT(*) FROM {$payments_table} p WHERE p.user_id=u.ID AND p.status='success') AS purchase_count
 	FROM {$wpdb->users} u
-	WHERE (
-		EXISTS (SELECT 1 FROM {$workshop_access} wa2 WHERE wa2.user_id=u.ID)
-		OR EXISTS (SELECT 1 FROM {$course_access} ca2 WHERE ca2.user_id=u.ID)
-		OR EXISTS (SELECT 1 FROM {$wpdb->usermeta} gm WHERE gm.user_id=u.ID AND gm.meta_key='ggm_phone')
-		OR EXISTS (SELECT 1 FROM {$wpdb->usermeta} mm WHERE mm.user_id=u.ID AND mm.meta_key='ggm_member')
-	) {$search_sql}
+	WHERE {$scope_sql} {$search_sql}
 	ORDER BY u.ID DESC";
 
 	$members = $params ? $wpdb->get_results( $wpdb->prepare( $sql, $params ) ) : $wpdb->get_results( $sql ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
@@ -213,12 +259,14 @@ function ggm_export_members_csv() {
 	};
 	foreach ( $members as $member ) {
 		$purchases = (int) $member->purchase_count;
+		$phone     = ggm_normalize_member_phone( $member->ggm_phone, $member->country_code )
+			?: ggm_normalize_member_phone( $member->billing_phone, $member->country_code );
 		fputcsv( $output, array(
 			(int) $member->ID,
 			$csv_safe( $member->display_name ),
 			$csv_safe( $member->user_login ),
 			$csv_safe( $member->user_email ),
-			$csv_safe( $member->phone ),
+			$csv_safe( $phone ),
 			$purchases,
 			$purchases > 0 ? 'Purchased' : 'Not Purchased',
 			$member->user_registered,

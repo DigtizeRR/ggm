@@ -13,6 +13,7 @@ class GGM_Access_Manager {
 		// Run before the older Members-page handler so manual grants also receive
 		// expiry and workshop-linked-course access.
 		add_action( 'wp_ajax_ggm_assign_member_content', array( __CLASS__, 'ajax_assign_content' ), 5 );
+		add_action( 'wp_ajax_ggm_bulk_assign_member_content', array( __CLASS__, 'ajax_bulk_assign_content' ) );
 		add_action( 'wp_ajax_ggm_get_member_access', array( __CLASS__, 'ajax_get_member_access' ) );
 		add_action( 'wp_ajax_ggm_remove_member_access', array( __CLASS__, 'ajax_remove_member_access' ) );
 	}
@@ -101,6 +102,72 @@ class GGM_Access_Manager {
 		wp_send_json_success( array( 'message' => $ok ? sprintf( __( '%s assigned successfully.', 'ggm-member-dashboard' ), $post->post_title ) : __( 'Access is already assigned or could not be updated.', 'ggm-member-dashboard' ) ) );
 	}
 
+	/** Assign one workshop or course to up to one visible Members-page batch. */
+	public static function ajax_bulk_assign_content() {
+		check_ajax_referer( 'ggm_admin_nonce', 'nonce' );
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( array( 'message' => __( 'Access denied.', 'ggm-member-dashboard' ) ), 403 );
+		}
+
+		$raw_user_ids = isset( $_POST['user_ids'] ) && is_array( $_POST['user_ids'] ) ? wp_unslash( $_POST['user_ids'] ) : array();
+		$user_ids     = array_values( array_unique( array_filter( array_map( 'absint', $raw_user_ids ) ) ) );
+		$item_id      = absint( $_POST['item_id'] ?? 0 );
+		$type         = sanitize_key( $_POST['item_type'] ?? '' );
+		$post         = get_post( $item_id );
+
+		if ( empty( $user_ids ) ) {
+			wp_send_json_error( array( 'message' => __( 'Select at least one member.', 'ggm-member-dashboard' ) ) );
+		}
+		if ( count( $user_ids ) > 20 ) {
+			wp_send_json_error( array( 'message' => __( 'Bulk assignment is limited to the 20 members visible on the current page.', 'ggm-member-dashboard' ) ) );
+		}
+		if ( ! $post || ! in_array( $type, array( 'course', 'workshop' ), true ) || ( 'course' === $type && 'course' !== $post->post_type ) || ( 'workshop' === $type && ! in_array( $post->post_type, array( 'workshop', 'ggm_workshop' ), true ) ) ) {
+			wp_send_json_error( array( 'message' => __( 'Please select a valid workshop or course.', 'ggm-member-dashboard' ) ) );
+		}
+
+		global $wpdb;
+		$assigned = 0;
+		$renewed  = 0;
+		$failed   = 0;
+		foreach ( $user_ids as $user_id ) {
+			if ( ! get_userdata( $user_id ) ) {
+				$failed++;
+				continue;
+			}
+
+			if ( 'course' === $type ) {
+				$existing = $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$wpdb->prefix}ggm_course_access WHERE user_id=%d AND course_id=%d", $user_id, $item_id ) );
+				$ok       = self::grant_course( $user_id, $item_id );
+			} else {
+				$existing = $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$wpdb->prefix}ggm_workshop_access WHERE user_id=%d AND workshop_id=%d", $user_id, $item_id ) );
+				$ok       = self::grant_workshop_bundle( $user_id, $item_id );
+			}
+
+			if ( ! $ok ) {
+				$failed++;
+			} elseif ( $existing ) {
+				$renewed++;
+			} else {
+				$assigned++;
+			}
+		}
+
+		$message = sprintf(
+			/* translators: 1: item title, 2: new assignments, 3: renewed assignments, 4: failed assignments. */
+			__( '%1$s processed: %2$d newly assigned, %3$d renewed, %4$d failed.', 'ggm-member-dashboard' ),
+			$post->post_title,
+			$assigned,
+			$renewed,
+			$failed
+		);
+		wp_send_json_success( array(
+			'message'  => $message,
+			'assigned' => $assigned,
+			'renewed'  => $renewed,
+			'failed'   => $failed,
+		) );
+	}
+
 	/** Return all explicitly assigned workshop/course access for one member. */
 	public static function ajax_get_member_access() {
 		check_ajax_referer( 'ggm_admin_nonce', 'nonce' );
@@ -140,8 +207,7 @@ class GGM_Access_Manager {
 	}
 
 	private static function normalize_phone( $value ) {
-		$digits = preg_replace( '/\D/', '', (string) $value );
-		return strlen( $digits ) >= 10 ? substr( $digits, -10 ) : '';
+		return ggm_normalize_member_phone( $value, '+91' );
 	}
 
 	private static function normalized_headers( array $headers ) {

@@ -115,9 +115,10 @@
 			option.addEventListener('click', function () {
 				hidden.value = option.dataset.code || '+91';
 				hidden.dispatchEvent(new Event('change', { bubbles: true }));
-				var image = toggle.querySelector('img');
+				var currentFlag = toggle.querySelector('.ggm-country-flag');
+				var selectedFlag = option.querySelector('.ggm-country-flag');
 				var text = toggle.querySelector('span');
-				if (image && option.dataset.flag) image.src = option.dataset.flag;
+				if (currentFlag && selectedFlag) currentFlag.replaceWith(selectedFlag.cloneNode(true));
 				if (text) text.textContent = option.dataset.code || '+91';
 				options.forEach(function (item) { item.setAttribute('aria-selected', item === option ? 'true' : 'false'); });
 				close(picker);

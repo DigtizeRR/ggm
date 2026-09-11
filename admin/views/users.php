@@ -17,15 +17,27 @@ if ( ! defined( 'ABSPATH' ) ) {
 global $wpdb;
 
 // ── Search ────────────────────────────────────────────────────────────────────
-$search   = isset( $_GET['s'] ) ? sanitize_text_field( wp_unslash( $_GET['s'] ) ) : '';
-$paged    = max( 1, absint( $_GET['paged'] ?? 1 ) );
-$per_page = 20;
-$offset   = ( $paged - 1 ) * $per_page;
+$search      = isset( $_GET['s'] ) ? sanitize_text_field( wp_unslash( $_GET['s'] ) ) : '';
+$workshop_id = absint( $_GET['workshop_id'] ?? 0 );
+$paged       = max( 1, absint( $_GET['paged'] ?? 1 ) );
+$per_page    = 20;
+$offset      = ( $paged - 1 ) * $per_page;
+
+if ( $workshop_id && ! in_array( get_post_type( $workshop_id ), array( 'workshop', 'ggm_workshop' ), true ) ) {
+	$workshop_id = 0;
+}
 
 $workshop_access_table = $wpdb->prefix . 'ggm_workshop_access';
 $course_access_table   = $wpdb->prefix . 'ggm_course_access';
 $assign_workshops = get_posts( array( 'post_type' => array( 'workshop', 'ggm_workshop' ), 'post_status' => 'publish', 'numberposts' => -1, 'orderby' => 'title', 'order' => 'ASC' ) );
 $assign_courses   = get_posts( array( 'post_type' => 'course', 'post_status' => 'publish', 'numberposts' => -1, 'orderby' => 'title', 'order' => 'ASC' ) );
+$filter_workshops = get_posts( array(
+	'post_type'      => array( 'workshop', 'ggm_workshop' ),
+	'post_status'    => array( 'publish', 'private', 'draft', 'pending', 'future' ),
+	'posts_per_page' => -1,
+	'orderby'        => 'title',
+	'order'          => 'ASC',
+) );
 
 // ── Build WHERE for search ────────────────────────────────────────────────────
 $where_sql = '';
@@ -45,39 +57,52 @@ if ( $search !== '' ) {
 // Part A: users with any workshop or course purchase.
 // Part B: users with ggm_phone meta but no purchase (OTP-only).
 
-$union_sql = "
-	SELECT DISTINCT u.ID
-	FROM {$wpdb->users} u
-	INNER JOIN {$workshop_access_table} wa ON wa.user_id = u.ID
-	{$where_sql}
+$query_args = array();
+if ( $workshop_id ) {
+	$union_sql  = "
+		SELECT DISTINCT u.ID
+		FROM {$wpdb->users} u
+		INNER JOIN {$workshop_access_table} wa ON wa.user_id = u.ID
+		WHERE wa.workshop_id = %d
+		{$where_sql}
+	";
+	$query_args = array_merge( array( $workshop_id ), $params );
+} else {
+	$union_sql = "
+		SELECT DISTINCT u.ID
+		FROM {$wpdb->users} u
+		INNER JOIN {$workshop_access_table} wa ON wa.user_id = u.ID
+		{$where_sql}
 
-	UNION
+		UNION
 
-	SELECT DISTINCT u.ID
-	FROM {$wpdb->users} u
-	INNER JOIN {$course_access_table} ca ON ca.user_id = u.ID
-	{$where_sql}
+		SELECT DISTINCT u.ID
+		FROM {$wpdb->users} u
+		INNER JOIN {$course_access_table} ca ON ca.user_id = u.ID
+		{$where_sql}
 
-	UNION
+		UNION
 
-	SELECT DISTINCT u.ID
-	FROM {$wpdb->users} u
-	INNER JOIN {$wpdb->usermeta} meta ON meta.user_id = u.ID AND meta.meta_key IN ('ggm_phone','ggm_member')
-	{$where_sql}
-";
+		SELECT DISTINCT u.ID
+		FROM {$wpdb->users} u
+		INNER JOIN {$wpdb->usermeta} meta ON meta.user_id = u.ID AND meta.meta_key IN ('ggm_phone','ggm_member')
+		{$where_sql}
+	";
+	$query_args = array_merge( $params, $params, $params );
+}
 
 // Count total
 $count_sql  = "SELECT COUNT(*) FROM ( {$union_sql} ) AS combined";
-$count_args = array_merge( $params, $params, $params );
+$count_args = $query_args;
 $total      = (int) $wpdb->get_var(
-	$params ? $wpdb->prepare( $count_sql, $count_args ) : $count_sql
+	$count_args ? $wpdb->prepare( $count_sql, $count_args ) : $count_sql
 );
 
 $pages = max( 1, (int) ceil( $total / $per_page ) );
 
 // Fetch paginated user IDs
 $ids_sql  = "SELECT ID FROM ( {$union_sql} ) AS combined ORDER BY ID DESC LIMIT %d OFFSET %d";
-$ids_args = array_merge( $params, $params, $params, array( $per_page, $offset ) );
+$ids_args = array_merge( $query_args, array( $per_page, $offset ) );
 $user_ids = $wpdb->get_col(
 	$wpdb->prepare( $ids_sql, $ids_args )
 );
@@ -117,16 +142,16 @@ if ( ! empty( $user_ids ) ) {
 		$purchase_counts[ $cc->user_id ] = ( $purchase_counts[ $cc->user_id ] ?? 0 ) + (int) $cc->cnt;
 	}
 
-	// Phone meta
+	// Phone metadata, resolved with one deliberate precedence rule.
 	$phones_raw = $wpdb->get_results(
 		$wpdb->prepare(
-			"SELECT user_id, meta_value FROM {$wpdb->usermeta} WHERE meta_key = 'ggm_phone' AND user_id IN ( {$id_placeholders} )",
+			"SELECT user_id, meta_key, meta_value FROM {$wpdb->usermeta} WHERE meta_key IN ('ggm_phone','billing_phone','ggm_whatsapp_country_code') AND user_id IN ( {$id_placeholders} ) ORDER BY umeta_id ASC",
 			$user_ids
 		)
 	);
-	$phones = array();
+	$phone_meta = array();
 	foreach ( $phones_raw as $p ) {
-		$phones[ $p->user_id ] = $p->meta_value;
+		$phone_meta[ $p->user_id ][ $p->meta_key ] = $p->meta_value;
 	}
 	$manual_member_ids = array_map(
 		'intval',
@@ -144,12 +169,18 @@ if ( ! empty( $user_ids ) ) {
 			continue;
 		}
 		$purchases = $purchase_counts[ $uid ] ?? 0;
+		$meta      = $phone_meta[ $uid ] ?? array();
+		$country   = $meta['ggm_whatsapp_country_code'] ?? '+91';
+		$phone     = ggm_normalize_member_phone( $meta['ggm_phone'] ?? '', $country )
+			?: ggm_normalize_member_phone( $meta['billing_phone'] ?? '', $country );
+		$raw_phone = (string) ( $meta['ggm_phone'] ?? ( $meta['billing_phone'] ?? '' ) );
 		$rows[]    = (object) array(
 			'user_id'         => $uid,
 			'display_name'    => $u->display_name,
 			'user_email'      => $u->user_email,
 			'user_registered' => $u->user_registered,
-			'phone'           => $phones[ $uid ] ?? '',
+			'phone'           => $phone,
+			'phone_invalid'   => '' === $phone && '' !== $raw_phone,
 			'purchases'       => $purchases,
 			'status'          => $purchases > 0 ? 'active' : ( in_array( (int) $uid, $manual_member_ids, true ) ? 'member' : 'otp_only' ),
 		);
@@ -162,7 +193,10 @@ $base_url = add_query_arg(
 	admin_url( 'admin.php' )
 );
 if ( $search !== '' ) {
-	$base_url = add_query_arg( 's', urlencode( $search ), $base_url );
+	$base_url = add_query_arg( 's', $search, $base_url );
+}
+if ( $workshop_id ) {
+	$base_url = add_query_arg( 'workshop_id', $workshop_id, $base_url );
 }
 ?>
 <div class="wrap">
@@ -170,16 +204,27 @@ if ( $search !== '' ) {
 	<button type="button" id="ggm-add-member-open" class="page-title-action"><?php esc_html_e( 'Add Member', 'ggm-member-dashboard' ); ?></button>
 	<hr class="wp-header-end">
 
-	<!-- Search form -->
+	<!-- Workshop filter, bulk action, and search controls. -->
 	<form method="get" action="">
-		<?php foreach ( $_GET as $k => $v ) :
-			if ( in_array( $k, array( 's', 'paged' ), true ) ) {
-				continue;
-			}
-			?>
-			<input type="hidden" name="<?php echo esc_attr( $k ); ?>" value="<?php echo esc_attr( $v ); ?>">
-		<?php endforeach; ?>
-		<p class="search-box">
+		<input type="hidden" name="page" value="<?php echo esc_attr( sanitize_key( $_GET['page'] ?? 'ggm-lms-users' ) ); ?>">
+		<div class="tablenav top" style="height:auto;min-height:34px;margin:12px 0 8px;">
+			<div class="alignleft actions">
+				<label class="screen-reader-text" for="ggm-member-workshop-filter"><?php esc_html_e( 'Filter members by workshop', 'ggm-member-dashboard' ); ?></label>
+				<select id="ggm-member-workshop-filter" name="workshop_id">
+					<option value="0"><?php esc_html_e( 'All Workshops', 'ggm-member-dashboard' ); ?></option>
+					<?php foreach ( $filter_workshops as $filter_workshop ) : ?>
+						<option value="<?php echo esc_attr( $filter_workshop->ID ); ?>" <?php selected( $workshop_id, $filter_workshop->ID ); ?>><?php echo esc_html( $filter_workshop->post_title ); ?></option>
+					<?php endforeach; ?>
+				</select>
+				<?php submit_button( __( 'Filter', 'ggm-member-dashboard' ), 'button', 'filter_action', false ); ?>
+				<button type="button" id="ggm-bulk-assign-open" class="button" disabled>
+					<?php esc_html_e( 'Assign New Access', 'ggm-member-dashboard' ); ?> <span id="ggm-bulk-selected-count" aria-hidden="true">(0)</span>
+				</button>
+				<?php if ( $search !== '' || $workshop_id ) : ?>
+					<a href="<?php echo esc_url( add_query_arg( 'page', sanitize_key( $_GET['page'] ?? 'ggm-lms-users' ), admin_url( 'admin.php' ) ) ); ?>" class="button"><?php esc_html_e( 'Clear', 'ggm-member-dashboard' ); ?></a>
+				<?php endif; ?>
+			</div>
+			<p class="search-box">
 			<label class="screen-reader-text" for="ggm-member-search"><?php esc_html_e( 'Search Members', 'ggm-member-dashboard' ); ?></label>
 			<input type="search"
 			       id="ggm-member-search"
@@ -188,13 +233,12 @@ if ( $search !== '' ) {
 			       placeholder="<?php esc_attr_e( 'Search by name, email or phone…', 'ggm-member-dashboard' ); ?>"
 			       style="width:280px;">
 			<?php submit_button( __( 'Search', 'ggm-member-dashboard' ), 'button', '', false ); ?>
-			<?php if ( $search !== '' ) : ?>
-				<a href="<?php echo esc_url( remove_query_arg( array( 's', 'paged' ) ) ); ?>" class="button"><?php esc_html_e( 'Clear', 'ggm-member-dashboard' ); ?></a>
-			<?php endif; ?>
-			<a href="<?php echo esc_url( wp_nonce_url( add_query_arg( array( 'action' => 'ggm_export_members', 's' => $search ), admin_url( 'admin-post.php' ) ), 'ggm_export_members' ) ); ?>" class="button button-primary" style="margin-left:6px;">
+			<a href="<?php echo esc_url( wp_nonce_url( add_query_arg( array( 'action' => 'ggm_export_members', 's' => $search, 'workshop_id' => $workshop_id ), admin_url( 'admin-post.php' ) ), 'ggm_export_members' ) ); ?>" class="button button-primary" style="margin-left:6px;">
 				<span class="dashicons dashicons-download" style="vertical-align:text-bottom;"></span> <?php esc_html_e( 'Export CSV', 'ggm-member-dashboard' ); ?>
 			</a>
-		</p>
+			</p>
+			<br class="clear">
+		</div>
 	</form>
 
 	<p style="margin-bottom:6px; color:#666;">
@@ -214,6 +258,7 @@ if ( $search !== '' ) {
 	<table class="wp-list-table widefat fixed striped" style="table-layout:auto;">
 		<thead>
 			<tr>
+				<td class="manage-column column-cb check-column"><input type="checkbox" class="ggm-member-check-all" aria-label="<?php esc_attr_e( 'Select all members on this page', 'ggm-member-dashboard' ); ?>"></td>
 				<th style="width:40px;"><?php esc_html_e( 'Avatar', 'ggm-member-dashboard' ); ?></th>
 				<th><?php esc_html_e( 'Name', 'ggm-member-dashboard' ); ?></th>
 				<th><?php esc_html_e( 'Email', 'ggm-member-dashboard' ); ?></th>
@@ -224,6 +269,19 @@ if ( $search !== '' ) {
 				<th><?php esc_html_e( 'Actions', 'ggm-member-dashboard' ); ?></th>
 			</tr>
 		</thead>
+		<tfoot>
+			<tr>
+				<td class="manage-column column-cb check-column"><input type="checkbox" class="ggm-member-check-all" aria-label="<?php esc_attr_e( 'Select all members on this page', 'ggm-member-dashboard' ); ?>"></td>
+				<th><?php esc_html_e( 'Avatar', 'ggm-member-dashboard' ); ?></th>
+				<th><?php esc_html_e( 'Name', 'ggm-member-dashboard' ); ?></th>
+				<th><?php esc_html_e( 'Email', 'ggm-member-dashboard' ); ?></th>
+				<th><?php esc_html_e( 'Phone', 'ggm-member-dashboard' ); ?></th>
+				<th><?php esc_html_e( 'Purchases', 'ggm-member-dashboard' ); ?></th>
+				<th><?php esc_html_e( 'Status', 'ggm-member-dashboard' ); ?></th>
+				<th><?php esc_html_e( 'Joined Date', 'ggm-member-dashboard' ); ?></th>
+				<th><?php esc_html_e( 'Actions', 'ggm-member-dashboard' ); ?></th>
+			</tr>
+		</tfoot>
 		<tbody>
 			<?php foreach ( $rows as $row ) :
 				// Status badge colours.
@@ -237,6 +295,7 @@ if ( $search !== '' ) {
 				$date_format = get_option( 'date_format' );
 			?>
 			<tr>
+				<th scope="row" class="check-column"><input type="checkbox" class="ggm-member-row-check" value="<?php echo esc_attr( $row->user_id ); ?>" aria-label="<?php echo esc_attr( sprintf( __( 'Select %s', 'ggm-member-dashboard' ), $row->display_name ) ); ?>"></th>
 				<!-- Avatar -->
 				<td><?php echo get_avatar( $row->user_id, 36, '', '', array( 'class' => '' ) ); ?></td>
 
@@ -251,7 +310,11 @@ if ( $search !== '' ) {
 				<td><?php echo esc_html( $row->user_email ); ?></td>
 
 				<!-- Phone -->
+				<?php if ( $row->phone_invalid ) : ?>
+					<td><span style="color:#b45309;font-weight:600;" title="<?php esc_attr_e( 'The saved phone value is invalid and was left unchanged for manual review.', 'ggm-member-dashboard' ); ?>"><?php esc_html_e( 'Needs review', 'ggm-member-dashboard' ); ?></span></td>
+				<?php else : ?>
 				<td><?php echo $row->phone !== '' ? esc_html( $row->phone ) : '<span style="color:#aaa;">—</span>'; ?></td>
+				<?php endif; ?>
 
 				<!-- Purchases -->
 				<td><?php echo $row->purchases > 0 ? esc_html( $row->purchases ) : '<span style="color:#aaa;">—</span>'; ?></td>
@@ -330,7 +393,7 @@ if ( $search !== '' ) {
 			<div id="ggm-member-new-panel" style="display:none;">
 				<p style="margin-top:0;"><label for="ggm-new-member-name"><strong><?php esc_html_e( 'Name', 'ggm-member-dashboard' ); ?></strong></label><br><input type="text" id="ggm-new-member-name" class="regular-text" style="width:100%;margin-top:5px;"></p>
 				<p><label for="ggm-new-member-email"><strong><?php esc_html_e( 'Email', 'ggm-member-dashboard' ); ?></strong></label><br><input type="email" id="ggm-new-member-email" class="regular-text" style="width:100%;margin-top:5px;"></p>
-				<p><label for="ggm-new-member-phone"><strong><?php esc_html_e( 'Phone', 'ggm-member-dashboard' ); ?></strong> <span style="color:#646970;font-weight:400;"><?php esc_html_e( '(optional)', 'ggm-member-dashboard' ); ?></span></label><br><input type="tel" id="ggm-new-member-phone" class="regular-text" style="width:100%;margin-top:5px;"></p>
+				<p><label for="ggm-new-member-phone"><strong><?php esc_html_e( 'Phone', 'ggm-member-dashboard' ); ?></strong> <span style="color:#646970;font-weight:400;"><?php esc_html_e( '(optional)', 'ggm-member-dashboard' ); ?></span></label><br><input type="tel" id="ggm-new-member-phone" class="regular-text" inputmode="numeric" maxlength="12" style="width:100%;margin-top:5px;"></p>
 			</div>
 			<div id="ggm-add-member-notice" style="display:none;margin-top:12px;padding:9px 12px;border-radius:4px;"></div>
 		</div>
@@ -365,7 +428,7 @@ if ( $search !== '' ) {
 		<div style="padding:20px;">
 			<p style="margin-top:0;"><?php esc_html_e( 'Access for:', 'ggm-member-dashboard' ); ?> <strong id="ggm-assign-member-name"></strong></p>
 			<input type="hidden" id="ggm-assign-user-id" value="">
-			<div style="margin:0 0 20px;padding-bottom:18px;border-bottom:1px solid #e5e7eb;">
+			<div id="ggm-current-access-section" style="margin:0 0 20px;padding-bottom:18px;border-bottom:1px solid #e5e7eb;">
 				<strong><?php esc_html_e( 'Current Access', 'ggm-member-dashboard' ); ?></strong>
 				<div id="ggm-current-access-list" style="margin-top:9px;"><p style="color:#64748b;margin:0;"><?php esc_html_e( 'Loading…', 'ggm-member-dashboard' ); ?></p></div>
 			</div>
@@ -396,6 +459,8 @@ if ( $search !== '' ) {
 	var nonce   = <?php echo wp_json_encode( wp_create_nonce( 'ggm_admin_nonce' ) ); ?>;
 	var addMode = 'existing';
 	var userSearchTimer;
+	var assignMode = 'single';
+	var assignUserIds = [];
 
 	$( '#ggm-add-member-open' ).on( 'click', function () {
 		$( '#ggm-add-member-notice' ).hide();
@@ -481,11 +546,46 @@ if ( $search !== '' ) {
 		}
 	} );
 
-	$( document ).on( 'click', '.ggm-assign-content-btn', function () {
-		$( '#ggm-assign-user-id' ).val( $( this ).data( 'user-id' ) );
-		$( '#ggm-assign-member-name' ).text( $( this ).data( 'user-name' ) );
+	function selectedMemberIds() {
+		return $( '.ggm-member-row-check:checked' ).map( function () { return parseInt( this.value, 10 ); } ).get().filter( function ( id ) { return id > 0; } );
+	}
+
+	function updateBulkSelection() {
+		var total = $( '.ggm-member-row-check' ).length;
+		var selected = selectedMemberIds().length;
+		$( '.ggm-member-check-all' ).prop( 'checked', total > 0 && selected === total ).prop( 'indeterminate', selected > 0 && selected < total );
+		$( '#ggm-bulk-assign-open' ).prop( 'disabled', selected === 0 );
+		$( '#ggm-bulk-selected-count' ).text( '(' + selected + ')' );
+	}
+
+	$( document ).on( 'change', '.ggm-member-check-all', function () {
+		$( '.ggm-member-row-check' ).prop( 'checked', this.checked );
+		updateBulkSelection();
+	} );
+	$( document ).on( 'change', '.ggm-member-row-check', updateBulkSelection );
+
+	$( '#ggm-bulk-assign-open' ).on( 'click', function () {
+		assignUserIds = selectedMemberIds();
+		if ( ! assignUserIds.length ) { return; }
+		assignMode = 'bulk';
+		$( '#ggm-assign-user-id' ).val( '' );
+		$( '#ggm-assign-member-name' ).text( assignUserIds.length + ' ' + <?php echo wp_json_encode( __( 'selected members', 'ggm-member-dashboard' ) ); ?> );
+		$( '#ggm-current-access-section' ).hide();
 		$( '#ggm-assign-item' ).val( '' );
 		$( '#ggm-assign-notice' ).hide();
+		$( '#ggm-assign-save' ).text( <?php echo wp_json_encode( __( 'Assign New Access', 'ggm-member-dashboard' ) ); ?> );
+		$( '#ggm-assign-modal' ).css( 'display', 'flex' );
+	} );
+
+	$( document ).on( 'click', '.ggm-assign-content-btn', function () {
+		assignMode = 'single';
+		assignUserIds = [ parseInt( $( this ).data( 'user-id' ), 10 ) ];
+		$( '#ggm-assign-user-id' ).val( $( this ).data( 'user-id' ) );
+		$( '#ggm-assign-member-name' ).text( $( this ).data( 'user-name' ) );
+		$( '#ggm-current-access-section' ).show();
+		$( '#ggm-assign-item' ).val( '' );
+		$( '#ggm-assign-notice' ).hide();
+		$( '#ggm-assign-save' ).text( <?php echo wp_json_encode( __( 'Assign Access', 'ggm-member-dashboard' ) ); ?> );
 		$( '#ggm-assign-modal' ).css( 'display', 'flex' );
 		loadMemberAccess();
 	} );
@@ -524,12 +624,15 @@ if ( $search !== '' ) {
 		var $button = $( this );
 		var $notice = $( '#ggm-assign-notice' );
 		if ( parts.length !== 2 ) { $notice.css( { display:'block', background:'#fee2e2', color:'#991b1b' } ).text( <?php echo wp_json_encode( __( 'Please select a workshop or course.', 'ggm-member-dashboard' ) ); ?> ); return; }
+		if ( assignMode === 'bulk' && ! assignUserIds.length ) { $notice.css( { display:'block', background:'#fee2e2', color:'#991b1b' } ).text( <?php echo wp_json_encode( __( 'Select at least one member.', 'ggm-member-dashboard' ) ); ?> ); return; }
+		var request = { action:'ggm_assign_member_content', nonce:nonce, user_id:$( '#ggm-assign-user-id' ).val(), item_type:parts[0], item_id:parts[1] };
+		if ( assignMode === 'bulk' ) { request.action = 'ggm_bulk_assign_member_content'; request.user_ids = assignUserIds; delete request.user_id; }
 		$button.prop( 'disabled', true ).text( <?php echo wp_json_encode( __( 'Assigning…', 'ggm-member-dashboard' ) ); ?> );
-		$.post( ajaxUrl, { action:'ggm_assign_member_content', nonce:nonce, user_id:$( '#ggm-assign-user-id' ).val(), item_type:parts[0], item_id:parts[1] } ).done( function ( res ) {
+		$.post( ajaxUrl, request ).done( function ( res ) {
 			var ok = !!res.success;
 			$notice.css( { display:'block', background:ok ? '#dcfce7' : '#fee2e2', color:ok ? '#166534' : '#991b1b' } ).text( res.data && res.data.message ? res.data.message : <?php echo wp_json_encode( __( 'Request failed.', 'ggm-member-dashboard' ) ); ?> );
 			if ( ok ) { setTimeout( function () { window.location.reload(); }, 900 ); }
-		} ).fail( function () { $notice.css( { display:'block', background:'#fee2e2', color:'#991b1b' } ).text( <?php echo wp_json_encode( __( 'Request failed. Please try again.', 'ggm-member-dashboard' ) ); ?> ); } ).always( function () { $button.prop( 'disabled', false ).text( <?php echo wp_json_encode( __( 'Assign Access', 'ggm-member-dashboard' ) ); ?> ); } );
+		} ).fail( function () { $notice.css( { display:'block', background:'#fee2e2', color:'#991b1b' } ).text( <?php echo wp_json_encode( __( 'Request failed. Please try again.', 'ggm-member-dashboard' ) ); ?> ); } ).always( function () { $button.prop( 'disabled', false ).text( assignMode === 'bulk' ? <?php echo wp_json_encode( __( 'Assign New Access', 'ggm-member-dashboard' ) ); ?> : <?php echo wp_json_encode( __( 'Assign Access', 'ggm-member-dashboard' ) ); ?> ); } );
 	} );
 })( jQuery );
 </script>

@@ -1233,6 +1233,92 @@ class GGM_Shortcodes {
 	}
 
 	/**
+	 * Format the booking card's workshop date range without repeating shared
+	 * month/year components. An explicit shortcode format retains the legacy
+	 * endpoint-by-endpoint formatting behavior.
+	 *
+	 * @param string $start_value       Start date in Y-m-d format.
+	 * @param string $end_value         End date in Y-m-d format.
+	 * @param string $explicit_format   Optional WordPress date format.
+	 * @return string
+	 */
+	private function format_booking_card_date_range( $start_value, $end_value, $explicit_format = '' ) {
+		$timezone = wp_timezone();
+		$parse_date = static function( $value ) use ( $timezone ) {
+			$value = trim( (string) $value );
+			if ( '' === $value ) {
+				return null;
+			}
+
+			$date   = DateTimeImmutable::createFromFormat( '!Y-m-d', $value, $timezone );
+			$errors = DateTimeImmutable::getLastErrors();
+			if ( ! $date || ( is_array( $errors ) && ( $errors['warning_count'] || $errors['error_count'] ) ) || $date->format( 'Y-m-d' ) !== $value ) {
+				return null;
+			}
+
+			return $date;
+		};
+
+		$start = $parse_date( $start_value );
+		$end   = $parse_date( $end_value );
+		if ( ! $start && ! $end ) {
+			return '';
+		}
+
+		$separator = ' – ';
+		if ( '' !== $explicit_format ) {
+			$start_label = $start ? wp_date( $explicit_format, $start->getTimestamp(), $timezone ) : '';
+			$end_label   = $end ? wp_date( $explicit_format, $end->getTimestamp(), $timezone ) : '';
+			if ( ! $start || ! $end || $start->format( 'Y-m-d' ) === $end->format( 'Y-m-d' ) ) {
+				return $start_label ?: $end_label;
+			}
+
+			return $start_label . $separator . $end_label;
+		}
+
+		$short_month = static function( DateTimeImmutable $date ) use ( $timezone ) {
+			$month = wp_date( 'F', $date->getTimestamp(), $timezone );
+			return function_exists( 'mb_substr' ) ? mb_substr( $month, 0, 4 ) : substr( $month, 0, 4 );
+		};
+		$single_date = static function( DateTimeImmutable $date ) use ( $short_month, $timezone ) {
+			return sprintf(
+				'%1$s %2$s, %3$s',
+				$short_month( $date ),
+				wp_date( 'j', $date->getTimestamp(), $timezone ),
+				wp_date( 'Y', $date->getTimestamp(), $timezone )
+			);
+		};
+
+		if ( ! $start || ! $end || $start->format( 'Y-m-d' ) === $end->format( 'Y-m-d' ) ) {
+			return $single_date( $start ?: $end );
+		}
+
+		if ( $start->format( 'Y-m' ) === $end->format( 'Y-m' ) ) {
+			return sprintf(
+				'%1$s %2$s–%3$s, %4$s',
+				$short_month( $start ),
+				wp_date( 'j', $start->getTimestamp(), $timezone ),
+				wp_date( 'j', $end->getTimestamp(), $timezone ),
+				wp_date( 'Y', $start->getTimestamp(), $timezone )
+			);
+		}
+
+		if ( $start->format( 'Y' ) === $end->format( 'Y' ) ) {
+			return sprintf(
+				'%1$s %2$s%3$s%4$s %5$s, %6$s',
+				$short_month( $start ),
+				wp_date( 'j', $start->getTimestamp(), $timezone ),
+				$separator,
+				$short_month( $end ),
+				wp_date( 'j', $end->getTimestamp(), $timezone ),
+				wp_date( 'Y', $start->getTimestamp(), $timezone )
+			);
+		}
+
+		return $single_date( $start ) . $separator . $single_date( $end );
+	}
+
+	/**
 	 * [ggm_workshop_booking_card id="" class="" date_format=""]
 	 *
 	 * A single, workshop-configured booking card for Elementor or standard
@@ -1247,15 +1333,12 @@ class GGM_Shortcodes {
 			return '';
 		}
 
-		// The booking card has a deliberate long-form default. An explicit
-		// shortcode date_format remains available for layouts that need it.
-		$date_format = sanitize_text_field( $atts['date_format'] ) ?: 'F j, Y';
+		// The default uses a compact, non-repeating range. An explicit shortcode
+		// date_format retains the legacy full-endpoint formatting behavior.
+		$date_format = sanitize_text_field( $atts['date_format'] );
 		$start_date  = get_post_meta( $workshop_id, 'workshop_start_date', true ) ?: get_post_meta( $workshop_id, 'workshop_date', true );
 		$end_date    = get_post_meta( $workshop_id, 'workshop_end_date', true );
-		$date_label  = $start_date && strtotime( $start_date ) ? date_i18n( $date_format, strtotime( $start_date ) ) : '';
-		if ( $end_date && strtotime( $end_date ) && $end_date !== $start_date ) {
-			$date_label .= ( $date_label ? ' – ' : '' ) . date_i18n( $date_format, strtotime( $end_date ) );
-		}
+		$date_label  = $this->format_booking_card_date_range( $start_date, $end_date, $date_format );
 
 		$mode        = trim( (string) get_post_meta( $workshop_id, 'workshop_mode', true ) );
 		$duration    = trim( (string) get_post_meta( $workshop_id, 'duration', true ) );
@@ -1493,7 +1576,7 @@ class GGM_Shortcodes {
 		ob_start();
 		echo '<section class="ggm-ws-block ggm-ws-block--why-different">';
 		if ( $this->show_workshop_block_heading( $atts['show_heading'] ) ) {
-			echo '<h2 class="ggm-ws-block__heading ggm-ws-why-different__section-heading">' . esc_html( ggm_get_workshop_block_heading( 'why_different', $workshop_id ) ) . '</h2>';
+			echo '<h2 class="ggm-ws-section-heading">' . esc_html( ggm_get_workshop_block_heading( 'why_different', $workshop_id ) ) . '</h2>';
 		}
 		echo '<div class="ggm-ws-why-different' . esc_attr( $layout['class'] ) . '"' . $layout['style'] . '>';
 		foreach ( $rows as $row ) {
@@ -1545,7 +1628,7 @@ class GGM_Shortcodes {
 		?>
 		<section class="ggm-ws-why-workshop-different">
 			<div class="ggm-ws-why-workshop-different__content">
-				<h2 class="ggm-ws-why-workshop-different__heading"><?php echo esc_html( $heading ); ?></h2>
+				<h2 class="ggm-ws-section-heading"><?php echo esc_html( $heading ); ?></h2>
 				<?php if ( '' !== $intro ) : ?><p class="ggm-ws-why-workshop-different__intro"><?php echo nl2br( esc_html( $intro ) ); ?></p><?php endif; ?>
 				<?php if ( ! empty( $points ) ) : ?>
 					<ul class="ggm-ws-why-workshop-different__points">
@@ -1591,7 +1674,7 @@ class GGM_Shortcodes {
 		ob_start();
 		?>
 		<section class="ggm-ws-journey" id="<?php echo esc_attr( $slider_id ); ?>">
-			<?php if ( '' !== $heading ) : ?><h2 class="ggm-ws-journey__heading"><?php echo esc_html( $heading ); ?></h2><?php endif; ?>
+			<?php if ( '' !== $heading ) : ?><h2 class="ggm-ws-section-heading"><?php echo esc_html( $heading ); ?></h2><?php endif; ?>
 			<?php if ( $pages ) : ?>
 				<div class="ggm-ws-journey__slider">
 					<div class="ggm-ws-journey__viewport"><div class="ggm-ws-journey__track">
@@ -1735,7 +1818,7 @@ class GGM_Shortcodes {
 		ob_start();
 		echo '<section class="ggm-ws-block ggm-ws-block--faq">';
 		if ( $this->show_workshop_block_heading( $atts['show_heading'] ) ) {
-			echo '<h2 class="ggm-ws-block__heading ggm-ws-faq__section-heading">' . esc_html( ggm_get_workshop_block_heading( 'faq', $workshop_id ) ) . '</h2>';
+			echo '<h2 class="ggm-ws-section-heading">' . esc_html( ggm_get_workshop_block_heading( 'faq', $workshop_id ) ) . '</h2>';
 		}
 		echo '<div class="ggm-ws-faq">';
 		foreach ( $rows as $row ) {
@@ -2316,7 +2399,7 @@ class GGM_Shortcodes {
 			<input type="text" class="ggm-ws-join-form__name" placeholder="<?php esc_attr_e( 'Enter Your Name', 'ggm-member-dashboard' ); ?>" required>
 			<div class="ggm-global-phone-control ggm-ws-join-form__phone-control">
 				<?php echo class_exists( 'GGM_Form_Builder' ) ? GGM_Form_Builder::country_picker_html( '', $uid . '-country-code', '+91' ) : '<input type="hidden" value="+91">'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
-				<input type="tel" class="ggm-ws-join-form__phone" placeholder="<?php esc_attr_e( 'Number', 'ggm-member-dashboard' ); ?>" inputmode="tel" autocomplete="tel-national" required>
+				<input type="tel" class="ggm-ws-join-form__phone" placeholder="<?php esc_attr_e( 'Number', 'ggm-member-dashboard' ); ?>" inputmode="tel" autocomplete="tel-national" maxlength="15" required>
 			</div>
 			<button type="submit" class="ggm-ws-join-form__btn"><?php echo esc_html( $atts['button_text'] ); ?></button>
 			<p class="ggm-ws-join-form__error ggm-is-hidden"></p>
@@ -2342,7 +2425,11 @@ class GGM_Shortcodes {
 					error.textContent = <?php echo wp_json_encode( __( 'Please enter your name.', 'ggm-member-dashboard' ) ); ?>;
 					return;
 				}
-				if (phone.length < 10) {
+				var dialDigits = String(countryInput ? countryInput.value : '+91').replace(/\D/g, '') || '91';
+				var validPhone = dialDigits === '91'
+					? (/^[6-9]\d{9}$/.test(phone) || /^0[6-9]\d{9}$/.test(phone) || /^91[6-9]\d{9}$/.test(phone))
+					: phone.length >= 4 && (dialDigits.length + phone.length) >= 7 && (dialDigits.length + phone.length) <= 15;
+				if (!validPhone) {
 					error.style.display = 'block';
 					error.textContent = <?php echo wp_json_encode( __( 'Please enter a valid phone number.', 'ggm-member-dashboard' ) ); ?>;
 					return;
@@ -2503,21 +2590,27 @@ ob_start();
 			<div class="ggm-ws-join-form-full__row">
 				<div class="ggm-ws-join-form-full__field">
 					<label class="ggm-ws-join-form-full__sr-only" for="<?php echo esc_attr( $uid ); ?>-name"><?php esc_html_e( 'Full name', 'ggm-member-dashboard' ); ?></label>
-					<input id="<?php echo esc_attr( $uid ); ?>-name" name="ggm_name" type="text" class="ggm-ws-join-form-full__name" placeholder="<?php esc_attr_e( 'Enter your full name', 'ggm-member-dashboard' ); ?>" autocomplete="name" required aria-describedby="<?php echo esc_attr( $uid ); ?>-name-error">
+					<div class="ggm-ws-join-form-full__input-wrap">
+						<span class="ggm-ws-join-form-full__input-icon" aria-hidden="true"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M20 21a8 8 0 0 0-16 0M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z"></path></svg></span>
+						<input id="<?php echo esc_attr( $uid ); ?>-name" name="ggm_name" type="text" class="ggm-ws-join-form-full__name" placeholder="<?php esc_attr_e( 'Enter your full name', 'ggm-member-dashboard' ); ?>" autocomplete="name" required aria-describedby="<?php echo esc_attr( $uid ); ?>-name-error">
+					</div>
 					<div class="ggm-field-error" id="<?php echo esc_attr( $uid ); ?>-name-error" aria-live="polite"></div>
 				</div>
 				<div class="ggm-ws-join-form-full__field">
 					<label class="ggm-ws-join-form-full__sr-only" for="<?php echo esc_attr( $uid ); ?>-phone"><?php esc_html_e( 'Phone number', 'ggm-member-dashboard' ); ?></label>
 					<div class="ggm-global-phone-control ggm-ws-join-form-full__phone-control">
 						<?php echo class_exists( 'GGM_Form_Builder' ) ? GGM_Form_Builder::country_picker_html( 'ggm_country_code', $uid . '-country-code', '+91' ) : '<input type="hidden" name="ggm_country_code" value="+91">'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
-						<input id="<?php echo esc_attr( $uid ); ?>-phone" name="ggm_phone" type="tel" class="ggm-ws-join-form-full__phone" placeholder="<?php esc_attr_e( 'Enter your phone number', 'ggm-member-dashboard' ); ?>" inputmode="tel" autocomplete="tel-national" required aria-describedby="<?php echo esc_attr( $uid ); ?>-phone-error">
+						<input id="<?php echo esc_attr( $uid ); ?>-phone" name="ggm_phone" type="tel" class="ggm-ws-join-form-full__phone" placeholder="<?php esc_attr_e( 'Enter your phone number', 'ggm-member-dashboard' ); ?>" inputmode="tel" autocomplete="tel-national" maxlength="15" required aria-describedby="<?php echo esc_attr( $uid ); ?>-phone-error">
 					</div>
 					<div class="ggm-field-error" id="<?php echo esc_attr( $uid ); ?>-phone-error" aria-live="polite"></div>
 				</div>
 			</div>
 			<div class="ggm-ws-join-form-full__field">
 				<label class="ggm-ws-join-form-full__sr-only" for="<?php echo esc_attr( $uid ); ?>-email"><?php esc_html_e( 'Email address', 'ggm-member-dashboard' ); ?></label>
-				<input id="<?php echo esc_attr( $uid ); ?>-email" name="ggm_email" type="email" class="ggm-ws-join-form-full__email" placeholder="<?php esc_attr_e( 'Enter your email address', 'ggm-member-dashboard' ); ?>" autocomplete="email" required aria-describedby="<?php echo esc_attr( $uid ); ?>-email-error">
+				<div class="ggm-ws-join-form-full__input-wrap">
+					<span class="ggm-ws-join-form-full__input-icon" aria-hidden="true"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="5" width="18" height="14" rx="1"></rect><path d="m3 7 9 6 9-6"></path></svg></span>
+					<input id="<?php echo esc_attr( $uid ); ?>-email" name="ggm_email" type="email" class="ggm-ws-join-form-full__email" placeholder="<?php esc_attr_e( 'Enter your email address', 'ggm-member-dashboard' ); ?>" autocomplete="email" required aria-describedby="<?php echo esc_attr( $uid ); ?>-email-error">
+				</div>
 				<div class="ggm-field-error" id="<?php echo esc_attr( $uid ); ?>-email-error" aria-live="polite"></div>
 			</div>
 
@@ -2780,13 +2873,13 @@ ob_start();
 				if (phoneInput && phoneError) {
 					phoneInput.addEventListener('input', function () {
 						var phone = phoneInput.value.trim().replace(/\D/g, '');
-						if (phone.length >= 10) {
+						if (isValidPhone(phone)) {
 							clearFieldError(phoneInput, phoneError);
 						}
 					});
 					phoneInput.addEventListener('blur', function () {
 						var phone = phoneInput.value.trim().replace(/\D/g, '');
-						if (phone.length >= 10) {
+						if (isValidPhone(phone)) {
 							clearFieldError(phoneInput, phoneError);
 						}
 					});
@@ -2918,7 +3011,11 @@ ob_start();
 
 			// Phone validation helper
 			function isValidPhone(phone) {
-				return phone.length >= 10;
+				var dialDigits = String(countryCodeInput ? countryCodeInput.value : '+91').replace(/\D/g, '') || '91';
+				if (dialDigits === '91') {
+					return /^[6-9]\d{9}$/.test(phone) || /^0[6-9]\d{9}$/.test(phone) || /^91[6-9]\d{9}$/.test(phone);
+				}
+				return phone.length >= 4 && (dialDigits.length + phone.length) >= 7 && (dialDigits.length + phone.length) <= 15;
 			}
 
 			// Validate both phone and email for OTP eligibility (universal requirement)
@@ -3147,7 +3244,7 @@ ob_start();
 					showFieldError(emailInput, emailError, <?php echo wp_json_encode( __( 'Please enter a valid email address.', 'ggm-member-dashboard' ) ); ?>);
 					hasError = true;
 				}
-				if (phone.length < 10) {
+				if (!isValidPhone(phone)) {
 					showFieldError(phoneInput, phoneError, <?php echo wp_json_encode( __( 'Please enter a valid phone number.', 'ggm-member-dashboard' ) ); ?>);
 					hasError = true;
 				}
@@ -3158,7 +3255,7 @@ ob_start();
 						nameInput.focus();
 					} else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
 						emailInput.focus();
-					} else if (phone.length < 10) {
+					} else if (!isValidPhone(phone)) {
 						phoneInput.focus();
 					}
 					return;
@@ -3245,6 +3342,7 @@ ob_start();
 						identifier: loginIdentifier,
 						phone: currentPhone,
 						email: currentEmail,
+						country_code: countryCodeInput ? countryCodeInput.value : '+91',
 						source: 'workshop_join_form_full'
 					}).then(function (res) {
 						if (!res.success) {
@@ -3488,11 +3586,9 @@ ob_start();
 	}
 
 	/**
-	 * [ggm_workshop_mentor id=""] — every mentor assigned to this workshop
-	 * (via the "Mentors" field in Workshop Details): circular photo, bold
-	 * name, and bio paragraph for each. Mentor profiles are created under
-	 * the Mentors admin menu. Renders a single card as before when only one
-	 * mentor is assigned; multiple mentors are laid out side by side.
+	 * [ggm_workshop_mentor id=""] — every mentor assigned to this workshop.
+	 * Cards are always kept inside the same two-column grid so one mentor (or
+	 * an odd final mentor) retains a single-card width instead of stretching.
 	 */
 	public function sc_workshop_mentor( $atts ) {
 		$atts        = shortcode_atts( array( 'id' => 0 ), $atts, 'ggm_workshop_mentor' );
@@ -3523,17 +3619,18 @@ ob_start();
 			}
 
 			ob_start();
-			echo '<div class="ggm-ws-mentor">';
+			echo '<article class="ggm-ws-mentor' . ( $image ? '' : ' ggm-ws-mentor--without-image' ) . '">';
 			if ( $image ) {
-				echo '<span class="ggm-ws-mentor__avatar"><img src="' . esc_url( $image ) . '" alt="' . esc_attr( $name ) . '" loading="lazy"></span>';
+				echo '<span class="ggm-ws-mentor__avatar"><img src="' . esc_url( $image ) . '" alt="' . esc_attr( $name ) . '" loading="lazy" decoding="async"></span>';
 			}
+			echo '<div class="ggm-ws-mentor__content">';
 			if ( $name ) {
-				echo '<p class="ggm-ws-mentor__name">' . esc_html( $name ) . '</p>';
+				echo '<h3 class="ggm-ws-mentor__name">' . esc_html( $name ) . '</h3>';
 			}
 			if ( $bio ) {
 				echo '<div class="ggm-ws-mentor__bio">' . wp_kses_post( wpautop( $bio ) ) . '</div>';
 			}
-			echo '</div>';
+			echo '</div></article>';
 			$cards[] = ob_get_clean();
 		}
 
@@ -3541,27 +3638,7 @@ ob_start();
 			return '';
 		}
 
-		$this->print_mentor_styles();
-
-		if ( 1 === count( $cards ) ) {
-			return $cards[0];
-		}
-
-		return '<div class="ggm-ws-mentors">' . implode( '', $cards ) . '</div>';
-	}
-
-	/**
-	 * Print the mentor profile block CSS once per page load.
-	 */
-	private function print_mentor_styles() {
-		static $printed = false;
-		if ( $printed ) {
-			return;
-		}
-		$printed = true;
-		?>
-		
-		<?php
+		return '<section class="ggm-ws-mentor-section"><div class="ggm-ws-mentors" data-mentor-count="' . esc_attr( count( $cards ) ) . '">' . implode( '', $cards ) . '</div></section>';
 	}
 
 	/**

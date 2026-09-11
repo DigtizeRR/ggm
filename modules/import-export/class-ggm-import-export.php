@@ -338,9 +338,7 @@ class GGM_Import_Export {
 	}
 
 	private static function normalize_member_phone( $value ) {
-		$digits = preg_replace( '/\D+/', '', (string) $value );
-		$digits = preg_replace( '/^(?:91|0)(?=\d{10}$)/', '', $digits );
-		return 10 === strlen( $digits ) ? $digits : '';
+		return ggm_normalize_member_phone( $value, '+91' );
 	}
 
 	private static function unique_member_login( $phone ) {

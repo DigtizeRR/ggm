@@ -49,22 +49,27 @@
 
 		// Task 10 — WhatsApp Number country code selector, default India.
 		var GGM_COUNTRY_CODES_FALLBACK = [
-			{ code: '+91',  label: '🇮🇳 +91' },
-			{ code: '+1',   label: '🇺🇸 +1' },
-			{ code: '+44',  label: '🇬🇧 +44' },
-			{ code: '+971', label: '🇦🇪 +971' },
-			{ code: '+966', label: '🇸🇦 +966' },
-			{ code: '+61',  label: '🇦🇺 +61' },
-			{ code: '+65',  label: '🇸🇬 +65' },
-			{ code: '+49',  label: '🇩🇪 +49' },
-			{ code: '+33',  label: '🇫🇷 +33' },
-			{ code: '+64',  label: '🇳🇿 +64' }
+			{ code: '+91',  dial: '+91',  iso: 'IN', name: 'India' },
+			{ code: '+1',   dial: '+1',   iso: 'US', name: 'United States' },
+			{ code: '+44',  dial: '+44',  iso: 'GB', name: 'United Kingdom' },
+			{ code: '+971', dial: '+971', iso: 'AE', name: 'United Arab Emirates' },
+			{ code: '+966', dial: '+966', iso: 'SA', name: 'Saudi Arabia' },
+			{ code: '+61',  dial: '+61',  iso: 'AU', name: 'Australia' },
+			{ code: '+65',  dial: '+65',  iso: 'SG', name: 'Singapore' },
+			{ code: '+49',  dial: '+49',  iso: 'DE', name: 'Germany' },
+			{ code: '+33',  dial: '+33',  iso: 'FR', name: 'France' },
+			{ code: '+64',  dial: '+64',  iso: 'NZ', name: 'New Zealand' }
 		];
 		var GGM_COUNTRY_CODES = (window.ggm_public && Array.isArray(window.ggm_public.country_codes) && window.ggm_public.country_codes.length)
 			? window.ggm_public.country_codes.map(function(country) {
-				return { code: country.dial, dial: country.dial, iso: country.iso, name: country.name || country.iso, flag: country.flag || '' };
+				return { code: country.dial, dial: country.dial, iso: country.iso, name: country.name || country.iso, flagSvg: country.flag_svg || '' };
 			})
 			: GGM_COUNTRY_CODES_FALLBACK;
+		function countryFlagSvg(iso) {
+			iso = String(iso || 'IN').toUpperCase().replace(/[^A-Z]/g, '');
+			var country = GGM_COUNTRY_CODES.find(function(item) { return String(item.iso || '').toUpperCase() === iso; });
+			return country && country.flagSvg ? country.flagSvg : '';
+		}
 
 		// ─────────────────────────────────────────────────────────────────────
 		// 1. Tab Switching Initialization
@@ -751,20 +756,20 @@
 			html += '      <div class="ggm-pf-group">';
 			html += '        <label>WhatsApp Number</label>';
 			var selectedCode = p.whatsapp_country_code || '+91';
-			var selectedCountry = GGM_COUNTRY_CODES.find(function(c) { return c.code === selectedCode; }) || GGM_COUNTRY_CODES[0] || { code: '+91', iso: 'IN', name: 'India', flag: '' };
+			var selectedCountry = GGM_COUNTRY_CODES.find(function(c) { return c.code === selectedCode; }) || GGM_COUNTRY_CODES[0] || { code: '+91', iso: 'IN', name: 'India' };
 			html += '        <div class="ggm-profile-phone-control">';
 			html += '          <div class="ggm-profile-country-picker">';
 			html += '            <input type="hidden" id="ggm-pf-country-code" data-country-value value="' + escapeHtml(selectedCountry.code || '+91') + '">';
 			html += '            <button type="button" class="ggm-profile-country-toggle" aria-haspopup="listbox" aria-expanded="false">';
-			if (selectedCountry.flag) html += '<img src="' + escapeHtml(selectedCountry.flag) + '" alt="">';
+			html += countryFlagSvg(selectedCountry.iso);
 			html += '<span>' + escapeHtml(selectedCountry.code || '+91') + '</span></button>';
 			html += '            <div class="ggm-profile-country-menu" role="listbox">';
 			html += '              <input type="search" class="ggm-profile-country-search" placeholder="Search country or code" aria-label="Search countries">';
 			$.each(GGM_COUNTRY_CODES, function(i, c) {
 				var countryName = c.name || c.iso || '';
 				var search = (countryName + ' ' + (c.iso || '') + ' ' + c.code).toLowerCase();
-				html += '<button type="button" class="ggm-profile-country-option" role="option" data-code="' + escapeHtml(c.code) + '" data-flag="' + escapeHtml(c.flag || '') + '" data-search="' + escapeHtml(search) + '" aria-selected="' + (c.code === selectedCountry.code ? 'true' : 'false') + '">';
-				if (c.flag) html += '<img src="' + escapeHtml(c.flag) + '" alt="" loading="lazy">';
+				html += '<button type="button" class="ggm-profile-country-option" role="option" data-code="' + escapeHtml(c.code) + '" data-iso="' + escapeHtml(String(c.iso || '').toLowerCase()) + '" data-search="' + escapeHtml(search) + '" aria-selected="' + (c.code === selectedCountry.code ? 'true' : 'false') + '">';
+				html += countryFlagSvg(c.iso);
 				html += '<span>' + escapeHtml(countryName ? countryName + ' ' + c.code : (c.label || c.code)) + '</span></button>';
 			});
 			html += '            </div></div>';
@@ -807,10 +812,10 @@
 				option.addEventListener('click', function() {
 					hidden.value = option.getAttribute('data-code') || hidden.value;
 					var label = toggle.querySelector('span');
-					var image = toggle.querySelector('img');
-					var flag = option.getAttribute('data-flag') || '';
+					var currentFlag = toggle.querySelector('.ggm-country-flag');
+					var selectedFlag = option.querySelector('.ggm-country-flag');
 					label.textContent = hidden.value;
-					if (flag) { if (!image) { image = document.createElement('img'); image.alt = ''; toggle.insertBefore(image, label); } image.src = flag; }
+					if (currentFlag && selectedFlag) currentFlag.replaceWith(selectedFlag.cloneNode(true));
 					options.forEach(function(item) { item.setAttribute('aria-selected', item === option ? 'true' : 'false'); });
 					closePicker(); toggle.focus();
 				});

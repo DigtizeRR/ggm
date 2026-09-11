@@ -505,6 +505,11 @@ class GGM_Public {
 		$login_url        = $login_page_id ? get_permalink( $login_page_id ) : home_url( '/workshop-login/' );
 		$checkout_page_id = (int) ggm_get_setting( 'ggm_checkout_page_id', 0 );
 		$checkout_url     = $checkout_page_id ? get_permalink( $checkout_page_id ) : home_url( '/membership-checkout/' );
+		$country_codes    = class_exists( 'GGM_Form_Builder' ) ? GGM_Form_Builder::country_calling_codes() : array();
+		foreach ( $country_codes as &$country ) {
+			$country['flag_svg'] = GGM_Form_Builder::country_flag_svg( $country['iso'] ?? '' );
+		}
+		unset( $country );
 
 		return array(
 			'ajaxurl'              => admin_url( 'admin-ajax.php' ),
@@ -535,7 +540,7 @@ class GGM_Public {
 			'dashboard_timeout_error' => __( 'The dashboard is taking too long to respond. Please try again.', 'ggm-member-dashboard' ),
 			'dashboard_config_error' => __( 'Dashboard configuration is unavailable. Please refresh the page.', 'ggm-member-dashboard' ),
 			'dashboard_retry'       => __( 'Try again', 'ggm-member-dashboard' ),
-			'country_codes'          => class_exists( 'GGM_Form_Builder' ) ? GGM_Form_Builder::country_calling_codes() : array(),
+			'country_codes'          => $country_codes,
 		);
 	}
 

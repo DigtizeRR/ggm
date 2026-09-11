@@ -91,6 +91,15 @@
 		};
 	}
 
+	function validContactPhone(phone, countryCode) {
+		var digits = String(phone || '').replace(/\D/g, '');
+		var dial = String(countryCode || '+91').replace(/\D/g, '') || '91';
+		if (dial === '91') {
+			return /^[6-9]\d{9}$/.test(digits) || /^0[6-9]\d{9}$/.test(digits) || /^91[6-9]\d{9}$/.test(digits);
+		}
+		return digits.length >= 4 && (dial.length + digits.length) >= 7 && (dial.length + digits.length) <= 15;
+	}
+
 	function getCurrencySymbol() {
 		var text = $('#ggm-checkout-subtotal').text() || '';
 		var match = text.match(/^[^\d]+/);
@@ -231,6 +240,10 @@
 
 		if ( ! name || ! phone || ! email) {
 			showError($fb, ggmCheckout.fill_details || 'Please fill in your name, WhatsApp number, and email.');
+			return;
+		}
+		if ( ! validContactPhone(phone, countryCode)) {
+			showError($fb, ggmCheckout.invalid_phone || 'Please enter a valid phone number for the selected country.');
 			return;
 		}
 

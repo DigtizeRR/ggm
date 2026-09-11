@@ -970,6 +970,138 @@ function ggm_mask_phone_number( $phone ) {
 	return str_repeat( '*', max( 0, strlen( $digits ) - 4 ) ) . substr( $digits, -4 );
 }
 
+/**
+ * Normalize a member phone number while keeping the country dial code separate.
+ *
+ * Indian OTP accounts use a canonical 10-digit national number. Other countries
+ * accept a national number only when the complete E.164 value remains between
+ * 7 and 15 digits. A pasted international prefix is removed only when retaining
+ * it would make the combined value invalid, avoiding guesses for local numbers
+ * that happen to begin with the same digits as their dial code.
+ *
+ * @param mixed  $phone        Raw phone value.
+ * @param string $country_code Selected country dial code.
+ * @return string Canonical national number, or an empty string when invalid.
+ */
+function ggm_normalize_member_phone( $phone, $country_code = '+91' ) {
+	$raw_phone   = trim( (string) $phone );
+	$digits      = preg_replace( '/\D+/', '', $raw_phone );
+	$dial_digits = preg_replace( '/\D+/', '', (string) $country_code );
+	$dial_digits = $dial_digits ?: '91';
+
+	if ( '91' === $dial_digits ) {
+		if ( 11 === strlen( $digits ) && '0' === substr( $digits, 0, 1 ) ) {
+			$digits = substr( $digits, 1 );
+		} elseif ( 12 === strlen( $digits ) && '91' === substr( $digits, 0, 2 ) ) {
+			$digits = substr( $digits, 2 );
+		}
+
+		return preg_match( '/^[6-9][0-9]{9}$/', $digits ) ? $digits : '';
+	}
+
+	$max_national_length = max( 4, 15 - strlen( $dial_digits ) );
+	$pasted_international = 0 === strpos( $raw_phone, '+' );
+	if ( ( $pasted_international || strlen( $digits ) > $max_national_length ) && 0 === strpos( $digits, $dial_digits ) ) {
+		$digits = substr( $digits, strlen( $dial_digits ) );
+	}
+
+	$complete_length = strlen( $dial_digits . $digits );
+	return preg_match( '/^[0-9]{4,14}$/', $digits ) && $complete_length >= 7 && $complete_length <= 15 ? $digits : '';
+}
+
+/**
+ * Return one canonical member phone using the same precedence everywhere.
+ *
+ * @param int $user_id WordPress user ID.
+ * @return string
+ */
+function ggm_get_member_phone( $user_id ) {
+	$user_id = absint( $user_id );
+	if ( ! $user_id ) {
+		return '';
+	}
+
+	$country_code = get_user_meta( $user_id, 'ggm_whatsapp_country_code', true ) ?: '+91';
+	foreach ( array( 'ggm_phone', 'billing_phone' ) as $meta_key ) {
+		$phone = ggm_normalize_member_phone( get_user_meta( $user_id, $meta_key, true ), $country_code );
+		if ( '' !== $phone ) {
+			return $phone;
+		}
+	}
+
+	return '';
+}
+
+/**
+ * Repair deterministic legacy phone corruption once, retaining original data.
+ *
+ * @return array Repair summary.
+ */
+function ggm_repair_legacy_member_phones() {
+	$complete = get_option( 'ggm_phone_integrity_repair_v1' );
+	if ( is_array( $complete ) && ! empty( $complete['completed_at'] ) ) {
+		return $complete;
+	}
+
+	global $wpdb;
+	$rows = $wpdb->get_results(
+		"SELECT user_id, meta_key, meta_value FROM {$wpdb->usermeta} WHERE meta_key IN ('ggm_phone','billing_phone','ggm_whatsapp_country_code') AND meta_value <> '' ORDER BY user_id ASC"
+	); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+	$grouped = array();
+	foreach ( $rows as $row ) {
+		$grouped[ (int) $row->user_id ][ $row->meta_key ] = (string) $row->meta_value;
+	}
+
+	$summary = array( 'repaired' => 0, 'canonicalized' => 0, 'ambiguous' => 0, 'completed_at' => current_time( 'mysql' ) );
+	foreach ( $grouped as $user_id => $values ) {
+		$country_code = $values['ggm_whatsapp_country_code'] ?? '+91';
+		$primary_raw  = $values['ggm_phone'] ?? '';
+		$billing_raw  = $values['billing_phone'] ?? '';
+		$primary      = ggm_normalize_member_phone( $primary_raw, $country_code );
+		$billing      = ggm_normalize_member_phone( $billing_raw, $country_code );
+		$canonical    = $primary ?: $billing;
+		$repaired     = false;
+
+		if ( $primary && $billing && $primary !== $billing ) {
+			$summary['ambiguous']++;
+			continue;
+		}
+
+		if ( ! $canonical && '91' === preg_replace( '/\D+/', '', (string) $country_code ) ) {
+			$source_digits = preg_replace( '/\D+/', '', $primary_raw ?: $billing_raw );
+			$candidate     = substr( $source_digits, 0, 10 );
+			if ( strlen( $source_digits ) > 12 && preg_match( '/^[6-9][0-9]{9}$/', $candidate ) ) {
+				$canonical = $candidate;
+				$repaired  = true;
+			}
+		}
+
+		if ( ! $canonical ) {
+			if ( '' !== $primary_raw || '' !== $billing_raw ) {
+				$summary['ambiguous']++;
+			}
+			continue;
+		}
+
+		if ( $primary_raw === $canonical && $billing_raw === $canonical ) {
+			continue;
+		}
+
+		add_user_meta( $user_id, 'ggm_phone_integrity_backup_v1', array(
+			'ggm_phone'     => $primary_raw,
+			'billing_phone' => $billing_raw,
+			'country_code'  => $country_code,
+			'backed_up_at'  => current_time( 'mysql' ),
+		), false );
+		update_user_meta( $user_id, 'ggm_phone', $canonical );
+		update_user_meta( $user_id, 'billing_phone', $canonical );
+		$summary[ $repaired ? 'repaired' : 'canonicalized' ]++;
+	}
+
+	update_option( 'ggm_phone_integrity_repair_v1', $summary, false );
+	return $summary;
+}
+
 /** Return the selected mentor names used as a course's instructors. */
 function ggm_get_course_mentor_names( $course_id ) {
 	$mentor_ids = get_post_meta( $course_id, 'ggm_mentor_ids', true );

@@ -190,11 +190,11 @@ class GGM_Health_Intake {
 			if ( '' === trim( (string) ( $_POST[ $field ] ?? '' ) ) ) { wp_send_json_error( array( 'message' => __( 'Please complete every required field.', 'ggm-member-dashboard' ) ) ); }
 		}
 		$email = sanitize_email( wp_unslash( $_POST['email'] ) );
-		$phone = preg_replace( '/\D+/', '', wp_unslash( $_POST['phone'] ) );
 		$country_code = class_exists( 'GGM_Form_Builder' )
 			? GGM_Form_Builder::sanitize_country_dial_value( $_POST['country_code'] ?? '+91' )
 			: '+91';
-		if ( ! is_email( $email ) || strlen( $phone ) < 7 || strlen( $phone ) > 15 ) { wp_send_json_error( array( 'message' => __( 'Enter a valid email and mobile number.', 'ggm-member-dashboard' ) ) ); }
+		$phone = ggm_normalize_member_phone( wp_unslash( $_POST['phone'] ), $country_code );
+		if ( ! is_email( $email ) || '' === $phone ) { wp_send_json_error( array( 'message' => __( 'Enter a valid email and mobile number.', 'ggm-member-dashboard' ) ) ); }
 
 		$report_path = '';
 		if ( ! empty( $_FILES['medical_report']['name'] ) ) {

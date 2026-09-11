@@ -227,6 +227,7 @@ class GGM_Auth {
 		$phone      = sanitize_text_field( wp_unslash( $_POST['phone'] ?? '' ) );
 		$email      = sanitize_email( wp_unslash( $_POST['email'] ?? '' ) );
 		$source     = sanitize_text_field( wp_unslash( $_POST['source'] ?? '' ) );
+		$country_code = sanitize_text_field( wp_unslash( $_POST['country_code'] ?? '+91' ) );
 
 		$is_workshop_join = ( 'workshop_join_form_full' === $source );
 		$has_phone_and_email = ( '' !== $phone && '' !== $email );
@@ -234,13 +235,13 @@ class GGM_Auth {
 		// Workshop join form flow: requires source parameter AND both phone and email
 		if ( $is_workshop_join ) {
 			// Validate phone
-			$clean_phone = preg_replace( '/\D/', '', $phone );
-			if ( strlen( $clean_phone ) < 10 ) {
+			$clean_phone = ggm_normalize_member_phone( $phone, $country_code );
+			if ( '' === $clean_phone ) {
 				ggm_log_otp_delivery_error( 'OTP request rejected: invalid phone number', array(
 					'stage'            => 'validation',
 					'identifier_type'  => 'phone',
 					'masked_identifier'=> ggm_mask_phone_number( $phone ),
-					'reason'           => 'Phone number must be at least 10 digits',
+					'reason'           => 'Phone number is invalid for the selected country',
 				) );
 				wp_send_json_error( array(
 					'message' => __( 'Please enter a valid phone number.', 'ggm-member-dashboard' ),
@@ -350,6 +351,7 @@ class GGM_Auth {
 		$phone      = sanitize_text_field( wp_unslash( $_POST['phone'] ?? '' ) );
 		$email      = sanitize_email( wp_unslash( $_POST['email'] ?? '' ) );
 		$source     = sanitize_text_field( wp_unslash( $_POST['source'] ?? '' ) );
+		$country_code = sanitize_text_field( wp_unslash( $_POST['country_code'] ?? '+91' ) );
 
 		$is_workshop_join = ( 'workshop_join_form_full' === $source );
 		$has_phone_and_email = ( '' !== $phone && '' !== $email );
@@ -357,13 +359,13 @@ class GGM_Auth {
 		// Workshop join form flow: requires source parameter AND both phone and email
 		if ( $is_workshop_join ) {
 			// Validate phone
-			$clean_phone = preg_replace( '/\D/', '', $phone );
-			if ( strlen( $clean_phone ) < 10 ) {
+			$clean_phone = ggm_normalize_member_phone( $phone, $country_code );
+			if ( '' === $clean_phone ) {
 				ggm_log_otp_delivery_error( 'OTP resend rejected: invalid phone number', array(
 					'stage'            => 'validation',
 					'identifier_type'  => 'phone',
 					'masked_identifier'=> ggm_mask_phone_number( $phone ),
-					'reason'           => 'Phone number must be at least 10 digits',
+					'reason'           => 'Phone number is invalid for the selected country',
 				) );
 				wp_send_json_error( array(
 					'message' => __( 'Please enter a valid phone number.', 'ggm-member-dashboard' ),
@@ -598,9 +600,13 @@ class GGM_Auth {
 		$phone        = sanitize_text_field( wp_unslash( $_POST['phone'] ?? '' ) );
 		$country_code = sanitize_text_field( wp_unslash( $_POST['country_code'] ?? '' ) );
 		$email        = sanitize_email( wp_unslash( $_POST['email'] ?? '' ) );
+		$clean_phone  = '' !== $phone ? ggm_normalize_member_phone( $phone, $country_code ?: '+91' ) : '';
 
 		if ( empty( $first_name ) ) {
 			wp_send_json_error( array( 'message' => __( 'First name is required.', 'ggm-member-dashboard' ) ) );
+		}
+		if ( '' !== $phone && '' === $clean_phone ) {
+			wp_send_json_error( array( 'message' => __( 'Please enter a valid phone number for the selected country.', 'ggm-member-dashboard' ) ) );
 		}
 
 		$update_args = array(
@@ -626,7 +632,6 @@ class GGM_Auth {
 		update_user_meta( $user_id, 'billing_last_name', $last_name );
 
 		if ( ! empty( $phone ) ) {
-			$clean_phone = preg_replace( '/\D/', '', $phone );
 			update_user_meta( $user_id, 'billing_phone', $clean_phone );
 			update_user_meta( $user_id, 'ggm_phone', $clean_phone );
 		}
@@ -681,7 +686,10 @@ class GGM_Auth {
 			wp_send_json_error( array( 'message' => __( 'An account with this email already exists. Please log in instead.', 'ggm-member-dashboard' ) ) );
 		}
 
-		$clean_phone = $phone_raw ? preg_replace( '/\D/', '', $phone_raw ) : '';
+		$clean_phone = $phone_raw ? ggm_normalize_member_phone( $phone_raw, $country_code ) : '';
+		if ( $phone_raw && '' === $clean_phone ) {
+			wp_send_json_error( array( 'message' => __( 'Please enter a valid phone number for the selected country.', 'ggm-member-dashboard' ) ) );
+		}
 
 		$username = 'user_' . strstr( $email, '@', true ) . '_' . wp_rand( 100, 999 );
 		$user_id  = wp_create_user( $username, $password, $email );
