@@ -506,15 +506,23 @@ class GGM_Form_Builder {
 			$amount = round( (float) ( $option['amount'] ?? 0 ), 2 );
 			if ( ! $id || isset( $seen_ids[ $id ] ) || '' === $label || $amount <= 0 ) { continue; }
 			$seen_ids[ $id ] = true;
-			$options[] = array( 'id' => $id, 'label' => $label, 'amount' => $amount );
+			$options[] = array(
+				'id'     => $id,
+				'label'  => $label,
+				'amount' => $amount,
+				'width'  => self::sanitize_field_width( $option['width'] ?? '100' ),
+			);
 		}
-		if ( ! $options ) {
+		// A legacy form has no payment_options key at all. Do not silently fall
+		// back to its old amount when a saved multi-price configuration is invalid.
+		if ( ! $options && ! array_key_exists( 'payment_options', $settings ) ) {
 			$legacy_amount = round( (float) ( $settings['payment_amount'] ?? 0 ), 2 );
 			if ( $legacy_amount > 0 ) {
 				$options[] = array(
 					'id'     => 'legacy_fixed_price',
 					'label'  => sanitize_text_field( $settings['payment_label'] ?? __( 'Payment', 'ggm-member-dashboard' ) ),
 					'amount' => $legacy_amount,
+					'width'  => '100',
 				);
 			}
 		}
@@ -539,7 +547,12 @@ class GGM_Form_Builder {
 			}
 			$seen_ids[ $id ] = true;
 			$seen_labels[ $label_key ] = true;
-			$options[] = array( 'id' => $id, 'label' => $label, 'amount' => $amount );
+			$options[] = array(
+				'id'     => $id,
+				'label'  => $label,
+				'amount' => $amount,
+				'width'  => self::sanitize_field_width( $row['width'] ?? '100' ),
+			);
 		}
 		return $options;
 	}
@@ -554,6 +567,12 @@ class GGM_Form_Builder {
 
 	private static function format_payment_option_amount( $amount, $currency ) {
 		return strtoupper( sanitize_text_field( $currency ) ) . ' ' . number_format_i18n( (float) $amount, 2 );
+	}
+
+	/** Width for the one price-selection group, with per-price widths retained only as a migration fallback. */
+	private static function payment_options_width( array $settings, array $options = array() ) {
+		$fallback = ! empty( $options[0]['width'] ) ? $options[0]['width'] : '100';
+		return self::sanitize_field_width( $settings['payment_options_width'] ?? $fallback );
 	}
 
 	private static function heading_size( $value ) {
@@ -651,6 +670,7 @@ class GGM_Form_Builder {
 			'payment_label' => sanitize_text_field( wp_unslash( $_POST['payment_label'] ?? 'Pay & Submit' ) ),
 			'payment_amount' => max( 0, round( (float) wp_unslash( $_POST['payment_amount'] ?? 0 ), 2 ) ), // Legacy fallback only.
 			'payment_options' => $payment_options,
+			'payment_options_width' => self::sanitize_field_width( $_POST['payment_options_width'] ?? '100' ),
 			'payment_currency' => strtoupper( sanitize_text_field( wp_unslash( $_POST['payment_currency'] ?? ggm_get_setting( 'ggm_currency', 'INR' ) ) ) ),
 			'payment_description' => sanitize_text_field( wp_unslash( $_POST['payment_description'] ?? '' ) ),
 			'payment_success' => wp_kses_post( wp_unslash( $_POST['payment_success'] ?? 'Payment received. Your response has been submitted.' ) ),
@@ -995,6 +1015,10 @@ class GGM_Form_Builder {
 		$guard = $form->id . ':' . $context . ':' . $context_id;
 		if ( isset( self::$rendered[ $guard ] ) ) { return ''; }
 		self::$rendered[ $guard ] = true;
+		// Assignment queries can supply an earlier row during a long request.
+		// Always render from the current canonical form settings and version.
+		$form = self::get_form( (int) $form->id );
+		if ( ! $form || 'published' !== $form->status ) { return ''; }
 		$schema = self::get_schema( $form );
 		$settings = json_decode( (string) $form->settings_json, true );
 		$settings = is_array( $settings ) ? $settings : array();
@@ -1004,6 +1028,7 @@ class GGM_Form_Builder {
 		if ( $user_id && 'workshop' === $context && ! ggm_user_has_workshop_access( $context_id, $user_id ) ) { return ''; }
 		if ( $user_id && 'course' === $context && ! ggm_user_has_course_access( $context_id, $user_id ) ) { return ''; }
 		$payment_options = self::get_payment_options( $settings );
+		$payment_options_width = self::payment_options_width( $settings, $payment_options );
 		$payment_enabled = ! empty( $settings['payment_enabled'] ) && ! empty( $payment_options );
 		$sections = (array) ( $schema['sections'] ?? array() );
 		if ( ! $sections ) { return ''; }
@@ -1478,9 +1503,13 @@ class GGM_Form_Builder {
 					color: #111827;
 					cursor: pointer;
 				}
-				.ggm-form-payment-options { margin: 20px 0; padding: 14px; border: 1px solid #cbd5e1; border-radius: 10px; }
-				.ggm-form-payment-options legend { padding: 0 6px; font-weight: 700; }
-				.ggm-form-payment-option { display: grid; grid-template-columns: auto minmax(0,1fr) auto; gap: 10px; align-items: center; margin: 8px 0; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; cursor: pointer; }
+				.ggm-form-payment-options { min-inline-size: 0; grid-column: 1 / -1; margin: 18px 0; padding: 0; border: 0; }
+				.ggm-form-page > .ggm-form-payment-options--width-50 { grid-column: span 5; }
+				.ggm-form-page > .ggm-form-payment-options--width-30 { grid-column: span 3; }
+				.ggm-form-payment-options legend { margin: 0 0 8px; padding: 0; font-weight: 700; }
+				.ggm-form-payment-options__choices { display: flex; flex-direction: column; gap: 10px; }
+				.ggm-form-payment-option { display: grid; grid-template-columns: auto minmax(0,1fr) auto; gap: 10px; align-items: center; width: 100%; margin: 0; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; cursor: pointer; }
+				.ggm-form-payment-option--single { cursor: default; }
 				.ggm-form-payment-option:has(input:checked) { border-color: #4338ca; background: #eef2ff; }
 				.ggm-form-payment-option__label { font-weight: 600; }
 				.ggm-form-payment-option__amount { font-weight: 700; white-space: nowrap; }
@@ -1497,7 +1526,7 @@ class GGM_Form_Builder {
 					.ggm-post-submit-actions {
 						flex-wrap: wrap;
 					}
-					.ggm-form-payment-option { grid-template-columns: auto minmax(0,1fr); }
+					.ggm-form-payment-option { grid-column: 1 / -1; grid-template-columns: auto minmax(0,1fr); }
 					.ggm-form-payment-option__amount { grid-column: 2; }
 				}
 			</style>
@@ -1521,16 +1550,24 @@ class GGM_Form_Builder {
 						<?php if ( ! empty( $section['description'] ) ) : ?><p><?php echo esc_html( $section['description'] ); ?></p><?php endif; ?>
 						<?php foreach ( (array) $section['fields'] as $field ) { self::render_field( $field, 'form-' . $form->id . '-' . $context . '-' . $context_id . '-', $user_id ); } ?>
 						<?php if ( $payment_enabled && $index + 1 === count( $sections ) ) : ?>
-							<fieldset class="ggm-form-payment-options">
-								<legend><?php esc_html_e( 'Choose a price', 'ggm-member-dashboard' ); ?></legend>
-								<?php foreach ( $payment_options as $option_index => $option ) : ?>
-									<?php $option_input_id = 'ggm-form-payment-' . $form->id . '-' . $context . '-' . $context_id . '-' . $option['id']; ?>
-									<label class="ggm-form-payment-option" for="<?php echo esc_attr( $option_input_id ); ?>">
-										<input id="<?php echo esc_attr( $option_input_id ); ?>" type="radio" name="payment_option_id" value="<?php echo esc_attr( $option['id'] ); ?>"<?php echo 0 === $option_index ? ' required' : ''; ?>>
-										<span class="ggm-form-payment-option__label"><?php echo esc_html( $option['label'] ); ?></span>
-										<span class="ggm-form-payment-option__amount"><?php echo esc_html( self::format_payment_option_amount( $option['amount'], $settings['payment_currency'] ?? ggm_get_setting( 'ggm_currency', 'INR' ) ) ); ?></span>
-									</label>
-								<?php endforeach; ?>
+							<fieldset class="ggm-form-payment-options ggm-form-payment-options--width-<?php echo esc_attr( $payment_options_width ); ?>">
+								<?php if ( 1 === count( $payment_options ) ) : ?>
+									<?php $option = $payment_options[0]; ?>
+									<input type="hidden" name="payment_option_id" value="<?php echo esc_attr( $option['id'] ); ?>">
+									<div class="ggm-form-payment-options__choices"><div class="ggm-form-payment-option ggm-form-payment-option--single"><span class="ggm-form-payment-option__label"><?php echo esc_html( $option['label'] ); ?></span><span class="ggm-form-payment-option__amount"><?php echo esc_html( self::format_payment_option_amount( $option['amount'], $settings['payment_currency'] ?? ggm_get_setting( 'ggm_currency', 'INR' ) ) ); ?></span></div></div>
+								<?php else : ?>
+									<legend><?php esc_html_e( 'Choose a price', 'ggm-member-dashboard' ); ?></legend>
+									<div class="ggm-form-payment-options__choices">
+										<?php foreach ( $payment_options as $option_index => $option ) : ?>
+											<?php $option_input_id = 'ggm-form-payment-' . $form->id . '-' . $context . '-' . $context_id . '-' . $option['id']; ?>
+											<label class="ggm-form-payment-option" for="<?php echo esc_attr( $option_input_id ); ?>">
+												<input id="<?php echo esc_attr( $option_input_id ); ?>" type="radio" name="payment_option_id" value="<?php echo esc_attr( $option['id'] ); ?>"<?php echo 0 === $option_index ? ' required' : ''; ?>>
+												<span class="ggm-form-payment-option__label"><?php echo esc_html( $option['label'] ); ?></span>
+												<span class="ggm-form-payment-option__amount"><?php echo esc_html( self::format_payment_option_amount( $option['amount'], $settings['payment_currency'] ?? ggm_get_setting( 'ggm_currency', 'INR' ) ) ); ?></span>
+											</label>
+										<?php endforeach; ?>
+									</div>
+								<?php endif; ?>
 							</fieldset>
 						<?php endif; ?>
 						<div class="ggm-form-nav">

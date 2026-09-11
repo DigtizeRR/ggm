@@ -11,6 +11,7 @@ Private member dashboard, membership, workshop, lesson, payment, and OTP system.
 == Changelog ==
 
 = 1.1.6 =
+* Added per-price-card width controls (100%, 50%, or 30%) and a clean non-radio display for single-price forms.
 * Added named multi-price choices to the Form Builder payment add-on. Visitors choose exactly one server-validated price before Razorpay checkout.
 * Preserved existing fixed-price paid forms as a compatible single price choice.
 * Added the resolved per-workshop or global section heading to all four Webinar Additional Block shortcodes.

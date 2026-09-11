@@ -10,6 +10,10 @@ This plan applies to the Form Builder payment add-on in **GGM Admin → Health F
 
 Implemented on the approved scope. The code now saves named paid choices, renders a required single-choice radio group, resolves the selected ID server-side before Razorpay order creation, snapshots the chosen heading/amount on the existing payment record, and retains a legacy fixed-price fallback for older forms. PHP syntax checks passed; live Razorpay test-mode checks remain required in the WordPress environment.
 
+### Approved layout extension
+
+Each price-choice card now has the same width controls as form fields: 100%, 50%, or 30%. The public price-choice group uses the form's existing ten-column grid and stacks cards to full width on narrow screens. A form with exactly one valid price renders that card without a radio selector and submits the server-approved option ID in a hidden field; forms with two or more prices retain the required radio group.
+
 ## Audit findings
 
 ### Existing configuration
