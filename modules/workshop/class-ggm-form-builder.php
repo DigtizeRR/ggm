@@ -493,6 +493,69 @@ class GGM_Form_Builder {
 		return in_array( $value, $allowed, true ) ? $value : $default;
 	}
 
+	/**
+	 * Return the server-approved paid choices for a form. Older paid forms did
+	 * not have choices, so their fixed amount remains a single stable fallback.
+	 */
+	public static function get_payment_options( array $settings ) {
+		$options = array();
+		$seen_ids = array();
+		foreach ( (array) ( $settings['payment_options'] ?? array() ) as $option ) {
+			$id     = sanitize_key( $option['id'] ?? '' );
+			$label  = sanitize_text_field( $option['label'] ?? '' );
+			$amount = round( (float) ( $option['amount'] ?? 0 ), 2 );
+			if ( ! $id || isset( $seen_ids[ $id ] ) || '' === $label || $amount <= 0 ) { continue; }
+			$seen_ids[ $id ] = true;
+			$options[] = array( 'id' => $id, 'label' => $label, 'amount' => $amount );
+		}
+		if ( ! $options ) {
+			$legacy_amount = round( (float) ( $settings['payment_amount'] ?? 0 ), 2 );
+			if ( $legacy_amount > 0 ) {
+				$options[] = array(
+					'id'     => 'legacy_fixed_price',
+					'label'  => sanitize_text_field( $settings['payment_label'] ?? __( 'Payment', 'ggm-member-dashboard' ) ),
+					'amount' => $legacy_amount,
+				);
+			}
+		}
+		return $options;
+	}
+
+	private function sanitize_payment_options( $raw_options ) {
+		$options = array();
+		$seen_labels = array();
+		$seen_ids = array();
+		foreach ( array_slice( (array) $raw_options, 0, 20 ) as $row ) {
+			$label = sanitize_text_field( wp_unslash( $row['label'] ?? '' ) );
+			$amount = round( (float) wp_unslash( $row['amount'] ?? 0 ), 2 );
+			$id = sanitize_key( wp_unslash( $row['id'] ?? '' ) );
+			$label_key = strtolower( trim( $label ) );
+			if ( '' === $label && $amount <= 0 ) { continue; }
+			if ( '' === $label || $amount <= 0 || isset( $seen_labels[ $label_key ] ) ) {
+				return new WP_Error( 'payment_options', __( 'Every payment price choice needs a unique heading and an amount greater than zero.', 'ggm-member-dashboard' ) );
+			}
+			if ( ! $id || isset( $seen_ids[ $id ] ) || 'legacy_fixed_price' === $id ) {
+				$id = 'price_' . strtolower( wp_generate_password( 12, false, false ) );
+			}
+			$seen_ids[ $id ] = true;
+			$seen_labels[ $label_key ] = true;
+			$options[] = array( 'id' => $id, 'label' => $label, 'amount' => $amount );
+		}
+		return $options;
+	}
+
+	private static function payment_option_by_id( array $settings, $option_id ) {
+		$option_id = sanitize_key( $option_id );
+		foreach ( self::get_payment_options( $settings ) as $option ) {
+			if ( hash_equals( $option['id'], $option_id ) ) { return $option; }
+		}
+		return null;
+	}
+
+	private static function format_payment_option_amount( $amount, $currency ) {
+		return strtoupper( sanitize_text_field( $currency ) ) . ' ' . number_format_i18n( (float) $amount, 2 );
+	}
+
 	private static function heading_size( $value ) {
 		if ( '' === trim( (string) $value ) ) { return ''; }
 		return max( 10, min( 96, absint( $value ) ) );
@@ -560,6 +623,12 @@ class GGM_Form_Builder {
 			if ( $form_id && self::get_form( $form_id ) ) { $redirect_args['edit_form'] = $form_id; }
 			wp_safe_redirect( add_query_arg( $redirect_args, admin_url( 'admin.php' ) ) ); exit;
 		}
+		$payment_options = $this->sanitize_payment_options( $_POST['payment_options'] ?? array() );
+		if ( is_wp_error( $payment_options ) ) {
+			$redirect_args = array( 'page'=>'ggm-health-intakes', 'tab'=>'builder', 'error'=>'invalid_payment_options' );
+			if ( $form_id && self::get_form( $form_id ) ) { $redirect_args['edit_form'] = $form_id; }
+			wp_safe_redirect( add_query_arg( $redirect_args, admin_url( 'admin.php' ) ) ); exit;
+		}
 		$settings = array(
 			'description' => sanitize_textarea_field( wp_unslash( $_POST['form_description'] ?? '' ) ),
 			'form_heading_tag' => $this->allowed_value( $_POST['form_heading_tag'] ?? 'h2', array( 'h1','h2','h3','h4','h5','h6','p' ), 'h2' ),
@@ -580,12 +649,18 @@ class GGM_Form_Builder {
 			'payment_first_heading_size' => $this->heading_size( $_POST['payment_first_heading_size'] ?? '' ),
 			'payment_first_text' => sanitize_textarea_field( wp_unslash( $_POST['payment_first_text'] ?? 'After payment is verified, the form fields will be available immediately.' ) ),
 			'payment_label' => sanitize_text_field( wp_unslash( $_POST['payment_label'] ?? 'Pay & Submit' ) ),
-			'payment_amount' => max( 0, round( (float) wp_unslash( $_POST['payment_amount'] ?? 0 ), 2 ) ),
+			'payment_amount' => max( 0, round( (float) wp_unslash( $_POST['payment_amount'] ?? 0 ), 2 ) ), // Legacy fallback only.
+			'payment_options' => $payment_options,
 			'payment_currency' => strtoupper( sanitize_text_field( wp_unslash( $_POST['payment_currency'] ?? ggm_get_setting( 'ggm_currency', 'INR' ) ) ) ),
 			'payment_description' => sanitize_text_field( wp_unslash( $_POST['payment_description'] ?? '' ) ),
 			'payment_success' => wp_kses_post( wp_unslash( $_POST['payment_success'] ?? 'Payment received. Your response has been submitted.' ) ),
 		);
-		if ( empty( $settings['payment_enabled'] ) || $settings['payment_amount'] <= 0 ) {
+		if ( ! empty( $settings['payment_enabled'] ) && ! $settings['payment_options'] ) {
+			$redirect_args = array( 'page'=>'ggm-health-intakes', 'tab'=>'builder', 'error'=>'invalid_payment_options' );
+			if ( $form_id && self::get_form( $form_id ) ) { $redirect_args['edit_form'] = $form_id; }
+			wp_safe_redirect( add_query_arg( $redirect_args, admin_url( 'admin.php' ) ) ); exit;
+		}
+		if ( empty( $settings['payment_enabled'] ) ) {
 			$settings['payment_enabled'] = false;
 			$settings['payment_amount']  = 0;
 		}
@@ -928,7 +1003,8 @@ class GGM_Form_Builder {
 		$user_id = get_current_user_id();
 		if ( $user_id && 'workshop' === $context && ! ggm_user_has_workshop_access( $context_id, $user_id ) ) { return ''; }
 		if ( $user_id && 'course' === $context && ! ggm_user_has_course_access( $context_id, $user_id ) ) { return ''; }
-		$payment_enabled = ! empty( $settings['payment_enabled'] ) && (float) ( $settings['payment_amount'] ?? 0 ) > 0;
+		$payment_options = self::get_payment_options( $settings );
+		$payment_enabled = ! empty( $settings['payment_enabled'] ) && ! empty( $payment_options );
 		$sections = (array) ( $schema['sections'] ?? array() );
 		if ( ! $sections ) { return ''; }
 		list( $visible_sections, $post_submit_fields ) = self::split_submit_fields( $sections );
@@ -1402,6 +1478,12 @@ class GGM_Form_Builder {
 					color: #111827;
 					cursor: pointer;
 				}
+				.ggm-form-payment-options { margin: 20px 0; padding: 14px; border: 1px solid #cbd5e1; border-radius: 10px; }
+				.ggm-form-payment-options legend { padding: 0 6px; font-weight: 700; }
+				.ggm-form-payment-option { display: grid; grid-template-columns: auto minmax(0,1fr) auto; gap: 10px; align-items: center; margin: 8px 0; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; cursor: pointer; }
+				.ggm-form-payment-option:has(input:checked) { border-color: #4338ca; background: #eef2ff; }
+				.ggm-form-payment-option__label { font-weight: 600; }
+				.ggm-form-payment-option__amount { font-weight: 700; white-space: nowrap; }
 				@media (max-width: 600px) {
 					.ggm-phone-country-control {
 						grid-template-columns: minmax(104px, max-content) minmax(0, 1fr);
@@ -1415,6 +1497,8 @@ class GGM_Form_Builder {
 					.ggm-post-submit-actions {
 						flex-wrap: wrap;
 					}
+					.ggm-form-payment-option { grid-template-columns: auto minmax(0,1fr); }
+					.ggm-form-payment-option__amount { grid-column: 2; }
 				}
 			</style>
 		<?php endif; ?>
@@ -1436,6 +1520,19 @@ class GGM_Form_Builder {
 						<?php if ( ! empty( $section['title'] ) && ! $duplicate_first_heading ) : ?><?php $section_heading_tag = self::allowed_value( $section['heading_tag'] ?? 'h3', array( 'h1','h2','h3','h4','h5','h6','p' ), 'h3' ); $section_heading_size = self::heading_size( $section['heading_size'] ?? '' ); ?><<?php echo esc_attr( $section_heading_tag ); ?> class="ggm-form-section-title"<?php echo $section_heading_size ? ' style="font-size:' . esc_attr( $section_heading_size ) . 'px"' : ''; ?>><?php echo esc_html( $section['title'] ); ?></<?php echo esc_attr( $section_heading_tag ); ?>><?php endif; ?>
 						<?php if ( ! empty( $section['description'] ) ) : ?><p><?php echo esc_html( $section['description'] ); ?></p><?php endif; ?>
 						<?php foreach ( (array) $section['fields'] as $field ) { self::render_field( $field, 'form-' . $form->id . '-' . $context . '-' . $context_id . '-', $user_id ); } ?>
+						<?php if ( $payment_enabled && $index + 1 === count( $sections ) ) : ?>
+							<fieldset class="ggm-form-payment-options">
+								<legend><?php esc_html_e( 'Choose a price', 'ggm-member-dashboard' ); ?></legend>
+								<?php foreach ( $payment_options as $option_index => $option ) : ?>
+									<?php $option_input_id = 'ggm-form-payment-' . $form->id . '-' . $context . '-' . $context_id . '-' . $option['id']; ?>
+									<label class="ggm-form-payment-option" for="<?php echo esc_attr( $option_input_id ); ?>">
+										<input id="<?php echo esc_attr( $option_input_id ); ?>" type="radio" name="payment_option_id" value="<?php echo esc_attr( $option['id'] ); ?>"<?php echo 0 === $option_index ? ' required' : ''; ?>>
+										<span class="ggm-form-payment-option__label"><?php echo esc_html( $option['label'] ); ?></span>
+										<span class="ggm-form-payment-option__amount"><?php echo esc_html( self::format_payment_option_amount( $option['amount'], $settings['payment_currency'] ?? ggm_get_setting( 'ggm_currency', 'INR' ) ) ); ?></span>
+									</label>
+								<?php endforeach; ?>
+							</fieldset>
+						<?php endif; ?>
 						<div class="ggm-form-nav">
 							<?php if ( $index ) : ?><button type="button" class="button ggm-form-back"><?php echo esc_html( $settings['back_label'] ?? __( 'Back', 'ggm-member-dashboard' ) ); ?></button><?php endif; ?>
 							<?php if ( $index + 1 < count( $sections ) ) : ?><button type="button" class="button button-primary ggm-form-next"><?php echo esc_html( $settings['next_label'] ?? __( 'Next', 'ggm-member-dashboard' ) ); ?></button>
@@ -2229,11 +2326,20 @@ JS;
 	}
 
 	public function create_form_payment() {
+		$form_id = absint( $_POST['form_id'] ?? 0 );
+		$preflight_form = self::get_form( $form_id );
+		$preflight_settings = $preflight_form ? json_decode( (string) $preflight_form->settings_json, true ) : array();
+		$preflight_settings = is_array( $preflight_settings ) ? $preflight_settings : array();
+		$selected_option = self::payment_option_by_id( $preflight_settings, $_POST['payment_option_id'] ?? '' );
+		if ( empty( $preflight_settings['payment_enabled'] ) || ! $selected_option ) {
+			wp_send_json_error( array( 'message' => __( 'Please choose a valid payment price.', 'ggm-member-dashboard' ) ), 400 );
+		}
 		$result   = $this->create_submission_from_request( 'pending_payment' );
 		$form     = $result['form'];
 		$settings = $result['settings'];
 		$user_id  = $result['user_id'];
-		$amount   = ! empty( $settings['payment_enabled'] ) ? round( (float) ( $settings['payment_amount'] ?? 0 ), 2 ) : 0.0;
+		$selected_option = self::payment_option_by_id( $settings, $_POST['payment_option_id'] ?? '' );
+		$amount   = $selected_option ? (float) $selected_option['amount'] : 0.0;
 		$currency = strtoupper( sanitize_text_field( $settings['payment_currency'] ?? ggm_get_setting( 'ggm_currency', 'INR' ) ) );
 
 		if ( $amount <= 0 ) {
@@ -2260,8 +2366,8 @@ JS;
 			'form_id'            => (int) $form->id,
 			'submission_id'      => (int) $result['submission_id'],
 			'user_id'            => $user_id,
-			'payment_key'        => 'primary',
-			'label'              => sanitize_text_field( $settings['payment_label'] ?? __( 'Pay & Submit', 'ggm-member-dashboard' ) ),
+			'payment_key'        => $selected_option['id'],
+			'label'              => $selected_option['label'],
 			'description'        => sanitize_text_field( $settings['payment_description'] ?? '' ),
 			'razorpay_order_id'  => sanitize_text_field( $order['id'] ?? '' ),
 			'amount'             => $amount,
@@ -2285,7 +2391,7 @@ JS;
 			'form_id'         => (int) $form->id,
 			'submission_id'   => (int) $result['submission_id'],
 			'name'            => get_bloginfo( 'name' ),
-			'description'     => sanitize_text_field( $settings['payment_description'] ?: $form->title ),
+			'description'     => sanitize_text_field( $settings['payment_description'] ?: $selected_option['label'] ?: $form->title ),
 			'guest_payment_token' => (string) ( $result['guest_payment_token'] ?? '' ),
 		) );
 	}
@@ -2320,12 +2426,15 @@ JS;
 		}
 
 		$now = current_time( 'mysql' );
-		$wpdb->update( self::table( 'ggm_form_payments' ), array(
+		$finalized = $wpdb->update( self::table( 'ggm_form_payments' ), array(
 			'status'              => 'success',
 			'razorpay_payment_id' => $rp_payment_id,
 			'razorpay_signature'  => $rp_signature,
 			'updated_at'          => $now,
-		), array( 'id'=>$form_payment_id ), array( '%s','%s','%s','%s' ), array( '%d' ) );
+		), array( 'id'=>$form_payment_id, 'status'=>'pending' ), array( '%s','%s','%s','%s' ), array( '%d','%s' ) );
+		if ( 1 !== $finalized ) {
+			wp_send_json_error( array( 'message' => __( 'This payment has already been processed. Refresh the page to view the result.', 'ggm-member-dashboard' ) ), 409 );
+		}
 		$form = self::get_form( (int) $payment->form_id );
 		$settings = $form ? json_decode( (string) $form->settings_json, true ) : array();
 		$settings = is_array( $settings ) ? $settings : array();
