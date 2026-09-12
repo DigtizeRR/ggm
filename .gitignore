@@ -8,6 +8,10 @@ cache/
 node_modules/
 vendor/
 
+# Local headless-browser comparison screenshots.
+scripts/*-visual-fixture.png
+scripts/shared-booking-summary-*.png
+
 # Local environment overrides.
 .env
 .env.*

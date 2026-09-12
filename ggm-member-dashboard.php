@@ -3,7 +3,7 @@
  * Plugin Name: Digtize LMS System
  * Plugin URI:  https://digtize.com/
  * Description: Complete private member dashboard for Global Good Health Mission with OTP authentication and a fully standalone membership, coupon, and workshop system.
- * Version:     1.1.8
+ * Version:     1.2.5
  * Author:      Rakesh Raushan
  * Author URI:  https://digtize.com/
  * License:     GPL v2 or later
@@ -20,7 +20,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
-define( 'GGM_VERSION',       '1.1.8' );
+define( 'GGM_VERSION',       '1.2.5' );
 define( 'GGM_DB_VERSION',    '3.3.0' );
 define( 'GGM_PLUGIN_FILE',   __FILE__ );
 define( 'GGM_PLUGIN_DIR',    plugin_dir_path( __FILE__ ) );

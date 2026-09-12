@@ -71,7 +71,9 @@ class GGM_Shortcodes {
 		add_shortcode( 'ggm_workshop_language_detail', array( $this, 'sc_workshop_language_detail' ) );
 		add_shortcode( 'ggm_workshop_contribution_detail', array( $this, 'sc_workshop_contribution_detail' ) );
 		add_shortcode( 'ggm_workshop_booking_card', array( $this, 'sc_workshop_booking_card' ) );
+		add_shortcode( 'ggm_workshop_booking_summary', array( $this, 'sc_workshop_booking_summary' ) );
 		add_shortcode( 'ggm_workshop_booking_card_hero_header', array( $this, 'sc_workshop_booking_card_hero_header' ) );
+		add_shortcode( 'ggm_workshop_form_text', array( $this, 'sc_workshop_form_text' ) );
 	}
 
 	/**
@@ -1349,11 +1351,7 @@ class GGM_Shortcodes {
 		if ( $duration && preg_match( '/\b\d+\s*(?:-| )?\s*days?\b/i', $duration, $duration_match ) ) {
 			$duration_label = trim( $duration_match[0] );
 		}
-		// Kept empty for the legacy internal rows array below. The booking-card
-		// schedule itself no longer renders individual time-slot rows.
-		$time_labels = array();
 		$price_html  = class_exists( 'GGM_Workshop' ) ? GGM_Workshop::price_html( $workshop_id ) : '';
-		$price_label = __( 'Price', 'ggm-member-dashboard' );
 		$price_note  = '';
 		$current_price_display = $price_html;
 		$regular_price_display = '';
@@ -1361,7 +1359,6 @@ class GGM_Shortcodes {
 			$regular_price = GGM_Workshop::get_regular_price( $workshop_id );
 			$sale_price    = GGM_Workshop::get_sale_price( $workshop_id );
 			if ( $sale_price > 0 && $sale_price < $regular_price ) {
-				$price_label = __( 'Special Price', 'ggm-member-dashboard' );
 				$savings     = $regular_price - $sale_price;
 				$format_amount = static function( $amount ) use ( $workshop_id ) {
 					return class_exists( 'GGM_Currency' ) && GGM_Currency::is_enabled()
@@ -1373,9 +1370,7 @@ class GGM_Shortcodes {
 				$savings_label = class_exists( 'GGM_Currency' ) && GGM_Currency::is_enabled()
 					? GGM_Currency::format_converted( $savings, $workshop_id )
 					: GGM_Workshop::get_currency( $workshop_id ) . number_format_i18n( $savings, 0 );
-				$price_note = sprintf( __( 'You save %s', 'ggm-member-dashboard' ), $savings_label );
-			} elseif ( GGM_Workshop::is_contribution( $workshop_id ) ) {
-				$price_label = __( 'Contribution', 'ggm-member-dashboard' );
+				$price_note = sprintf( __( 'You Save %s', 'ggm-member-dashboard' ), $savings_label );
 			}
 		}
 		$hero_items  = get_post_meta( $workshop_id, 'ggm_workshop_booking_card_hero_items', true );
@@ -1390,12 +1385,6 @@ class GGM_Shortcodes {
 		$form_anchor      = 'ggm-workshop-join-form-full-' . $workshop_id;
 		$extra_classes = array_filter( array_map( 'sanitize_html_class', preg_split( '/\s+/', (string) $atts['class'] ) ) );
 		$classes = trim( 'ggm-workshop-booking-card ' . implode( ' ', $extra_classes ) );
-
-		$rows = array(
-			'date'  => $date_label,
-			'time'  => implode( ' · ', $time_labels ),
-			'mode'  => $mode,
-		);
 
 		ob_start();
 		?>
@@ -1412,22 +1401,37 @@ class GGM_Shortcodes {
 				</div>
 			<?php endif; ?>
 			<section class="<?php echo esc_attr( $classes ); ?>">
-			<?php $date_detail = implode( ' | ', array_filter( array( $duration_label, $mode ) ) ); ?>
-			<?php if ( $date_label || $date_detail ) : ?>
-				<div class="ggm-workshop-booking-card__schedule">
-					<span class="ggm-workshop-booking-card__calendar-icon" aria-hidden="true"><?php echo $this->icon_svg( 'calendar' ); // phpcs:ignore WordPress.Security.EscapeOutput -- Fixed, trusted inline SVG. ?></span>
-					<div><strong><?php echo esc_html( $date_label ); ?></strong><?php if ( $date_detail ) : ?><span><?php echo esc_html( $date_detail ); ?></span><?php endif; ?></div>
-				</div>
-			<?php endif; ?>
-			<?php if ( $price_html ) : ?>
-				<div class="ggm-workshop-booking-card__price">
-					<div class="ggm-workshop-booking-card__price-main">
-						<div class="ggm-workshop-booking-card__price-content">
-						<span class="ggm-workshop-booking-card__price-label"><?php echo esc_html( $price_label ); ?></span>
-						<span class="ggm-workshop-booking-card__price-value"><?php echo wp_kses_post( $current_price_display ); ?></span>
-						</div>
+			<?php
+			$date_detail = $mode ?: $duration_label;
+			$has_schedule = (bool) ( $date_label || $date_detail );
+			$has_price    = (bool) $price_html;
+			$summary_classes = array( 'ggm-workshop-booking-summary' );
+			if ( ! $has_schedule ) {
+				$summary_classes[] = 'ggm-workshop-booking-summary--price-only';
+			} elseif ( ! $has_price ) {
+				$summary_classes[] = 'ggm-workshop-booking-summary--schedule-only';
+			}
+			?>
+			<?php if ( $has_schedule || $has_price ) : ?>
+				<div class="ggm-workshop-booking-summary-wrap">
+					<div class="<?php echo esc_attr( implode( ' ', $summary_classes ) ); ?>">
+						<?php if ( $has_schedule ) : ?>
+							<div class="ggm-workshop-booking-summary__schedule">
+								<span class="ggm-workshop-booking-summary__calendar" aria-hidden="true"><?php echo $this->icon_svg( 'calendar' ); // phpcs:ignore WordPress.Security.EscapeOutput -- Fixed, trusted inline SVG. ?></span>
+								<div class="ggm-workshop-booking-summary__schedule-content"><?php if ( $date_label ) : ?><strong><?php echo esc_html( $date_label ); ?></strong><?php endif; ?><?php if ( $date_detail ) : ?><span><?php echo esc_html( $date_detail ); ?></span><?php endif; ?></div>
+							</div>
+						<?php endif; ?>
+						<?php if ( $has_schedule && $has_price ) : ?><span class="ggm-workshop-booking-summary__divider" aria-hidden="true"></span><?php endif; ?>
+						<?php if ( $has_price ) : ?>
+							<div class="ggm-workshop-booking-summary__price-section">
+								<?php if ( $has_schedule ) : ?><span class="ggm-workshop-booking-summary__money" aria-hidden="true"><?php echo $this->icon_svg( 'money' ); // phpcs:ignore WordPress.Security.EscapeOutput -- Fixed, trusted inline SVG. ?></span><?php endif; ?>
+								<div class="ggm-workshop-booking-summary__price">
+									<div class="ggm-workshop-booking-summary__price-line"><span class="ggm-workshop-booking-summary__current-price"><?php echo wp_kses_post( $current_price_display ); ?></span><?php if ( $regular_price_display ) : ?><del><?php echo esc_html( $regular_price_display ); ?></del><?php endif; ?></div>
+									<?php if ( $price_note ) : ?><span class="ggm-workshop-booking-summary__saving"><?php echo esc_html( $price_note ); ?></span><?php endif; ?>
+								</div>
+							</div>
+						<?php endif; ?>
 					</div>
-					<?php if ( $regular_price_display ) : ?><div class="ggm-workshop-booking-card__price-meta"><del><?php echo esc_html( $regular_price_display ); ?></del><span class="ggm-workshop-booking-card__price-note"><?php echo esc_html( $price_note ); ?></span></div><?php endif; ?>
 				</div>
 			<?php endif; ?>
 			<a class="ggm-workshop-booking-card__button" href="#<?php echo esc_attr( $form_anchor ); ?>"><span class="ggm-workshop-booking-card__button-heading"><?php echo esc_html( $cta_heading ?: __( 'Reserve My Spot Now', 'ggm-member-dashboard' ) ); ?></span><span class="ggm-workshop-booking-card__button-text"><?php echo esc_html( $cta_text ?: __( 'Submit Now', 'ggm-member-dashboard' ) ); ?></span></a>
@@ -1437,6 +1441,93 @@ class GGM_Shortcodes {
 					<?php if ( $rating_text ) : ?><span><span class="ggm-workshop-booking-card__stars" aria-hidden="true">★★★★★</span><?php echo esc_html( $rating_text ); ?></span><?php endif; ?>
 				</div>
 			<?php endif; ?>
+			</section>
+		</div>
+		<?php
+		return ob_get_clean();
+	}
+
+	/**
+	 * [ggm_workshop_booking_summary id="" class="" date_format=""]
+	 *
+	 * A compact, separately placeable schedule-and-price summary. This is kept
+	 * independent from [ggm_workshop_booking_card] so placing it elsewhere does
+	 * not alter the existing booking card, CTA, hero, or testimonial.
+	 */
+	public function sc_workshop_booking_summary( $atts ) {
+		$atts        = shortcode_atts( array( 'id' => 0, 'class' => '', 'date_format' => '' ), $atts, 'ggm_workshop_booking_summary' );
+		$workshop_id = $this->resolve_workshop_id( $atts );
+		if ( ! $workshop_id || ! in_array( get_post_type( $workshop_id ), array( 'workshop', 'ggm_workshop' ), true ) ) {
+			return '';
+		}
+
+		$date_format = sanitize_text_field( $atts['date_format'] );
+		$start_date  = get_post_meta( $workshop_id, 'workshop_start_date', true ) ?: get_post_meta( $workshop_id, 'workshop_date', true );
+		$end_date    = get_post_meta( $workshop_id, 'workshop_end_date', true );
+		$date_label  = $this->format_booking_card_date_range( $start_date, $end_date, $date_format );
+		$mode        = trim( (string) get_post_meta( $workshop_id, 'workshop_mode', true ) );
+		$duration    = trim( (string) get_post_meta( $workshop_id, 'duration', true ) );
+		$duration_label = $duration;
+		if ( $duration && preg_match( '/\b\d+\s*(?:-| )?\s*days?\b/i', $duration, $duration_match ) ) {
+			$duration_label = trim( $duration_match[0] );
+		}
+		$date_detail = $mode ?: $duration_label;
+
+		$price_html           = class_exists( 'GGM_Workshop' ) ? GGM_Workshop::price_html( $workshop_id ) : '';
+		$current_price_display = $price_html;
+		$regular_price_display = '';
+		$price_note            = '';
+		if ( class_exists( 'GGM_Workshop' ) ) {
+			$regular_price = GGM_Workshop::get_regular_price( $workshop_id );
+			$sale_price    = GGM_Workshop::get_sale_price( $workshop_id );
+			if ( $sale_price > 0 && $sale_price < $regular_price ) {
+				$format_amount = static function( $amount ) use ( $workshop_id ) {
+					return class_exists( 'GGM_Currency' ) && GGM_Currency::is_enabled()
+						? GGM_Currency::format_converted( $amount, $workshop_id )
+						: GGM_Workshop::get_currency( $workshop_id ) . number_format_i18n( $amount, 0 );
+				};
+				$current_price_display = esc_html( $format_amount( $sale_price ) );
+				$regular_price_display = esc_html( $format_amount( $regular_price ) );
+				$savings_display       = $format_amount( $regular_price - $sale_price );
+				$price_note            = sprintf( __( 'You Save %s', 'ggm-member-dashboard' ), $savings_display );
+			}
+		}
+
+		$has_schedule = (bool) ( $date_label || $date_detail );
+		$has_price    = (bool) $price_html;
+		if ( ! $has_schedule && ! $has_price ) {
+			return '';
+		}
+
+		$extra_classes = array_filter( array_map( 'sanitize_html_class', preg_split( '/\s+/', (string) $atts['class'] ) ) );
+		$classes       = array( 'ggm-workshop-booking-summary' );
+		if ( ! $has_schedule ) {
+			$classes[] = 'ggm-workshop-booking-summary--price-only';
+		} elseif ( ! $has_price ) {
+			$classes[] = 'ggm-workshop-booking-summary--schedule-only';
+		}
+		$classes = array_merge( $classes, $extra_classes );
+
+		ob_start();
+		?>
+		<div class="ggm-workshop-booking-summary-wrap">
+			<section class="<?php echo esc_attr( implode( ' ', $classes ) ); ?>">
+				<?php if ( $has_schedule ) : ?>
+					<div class="ggm-workshop-booking-summary__schedule">
+						<span class="ggm-workshop-booking-summary__calendar" aria-hidden="true"><?php echo $this->icon_svg( 'calendar' ); // phpcs:ignore WordPress.Security.EscapeOutput -- Fixed, trusted inline SVG. ?></span>
+						<div class="ggm-workshop-booking-summary__schedule-content"><?php if ( $date_label ) : ?><strong><?php echo esc_html( $date_label ); ?></strong><?php endif; ?><?php if ( $date_detail ) : ?><span><?php echo esc_html( $date_detail ); ?></span><?php endif; ?></div>
+					</div>
+				<?php endif; ?>
+				<?php if ( $has_schedule && $has_price ) : ?><span class="ggm-workshop-booking-summary__divider" aria-hidden="true"></span><?php endif; ?>
+				<?php if ( $has_price ) : ?>
+					<div class="ggm-workshop-booking-summary__price-section">
+						<?php if ( $has_schedule ) : ?><span class="ggm-workshop-booking-summary__money" aria-hidden="true"><?php echo $this->icon_svg( 'money' ); // phpcs:ignore WordPress.Security.EscapeOutput -- Fixed, trusted inline SVG. ?></span><?php endif; ?>
+						<div class="ggm-workshop-booking-summary__price">
+							<div class="ggm-workshop-booking-summary__price-line"><span class="ggm-workshop-booking-summary__current-price"><?php echo wp_kses_post( $current_price_display ); ?></span><?php if ( $regular_price_display ) : ?><del><?php echo esc_html( $regular_price_display ); ?></del><?php endif; ?></div>
+							<?php if ( $price_note ) : ?><span class="ggm-workshop-booking-summary__saving"><?php echo esc_html( $price_note ); ?></span><?php endif; ?>
+						</div>
+					</div>
+				<?php endif; ?>
 			</section>
 		</div>
 		<?php
@@ -1459,6 +1550,35 @@ class GGM_Shortcodes {
 
 		$class = trim( 'ggm-workshop-booking-card__hero-header ' . sanitize_html_class( $atts['class'] ) );
 		return '<div class="' . esc_attr( $class ) . '">' . $header . '</div>'; // phpcs:ignore WordPress.Security.EscapeOutput -- Saved and rendered through the restricted Hero Header allowlist.
+	}
+
+	/**
+	 * [ggm_workshop_form_text id=""] — workshop-configured heading and rich text.
+	 */
+	public function sc_workshop_form_text( $atts ) {
+		$atts        = shortcode_atts( array( 'id' => 0 ), $atts, 'ggm_workshop_form_text' );
+		$workshop_id = $this->resolve_workshop_id( $atts );
+		if ( ! $workshop_id || ! in_array( get_post_type( $workshop_id ), array( 'workshop', 'ggm_workshop' ), true ) ) {
+			return '';
+		}
+
+		$heading_raw = get_post_meta( $workshop_id, 'ggm_workshop_form_text_heading', true );
+		$content_raw = get_post_meta( $workshop_id, 'ggm_workshop_form_text_content', true );
+		$heading = is_scalar( $heading_raw ) ? trim( (string) $heading_raw ) : '';
+		$content = is_scalar( $content_raw ) ? wp_kses_post( (string) $content_raw ) : '';
+		$has_rich_content = '' !== trim( wp_strip_all_tags( $content ) ) || (bool) preg_match( '/<(?:audio|figure|gallery|img|video)\b/i', $content );
+		if ( '' === $heading && ! $has_rich_content ) {
+			return '';
+		}
+
+		ob_start();
+		?>
+		<section class="ggm-ws-form-text">
+			<?php if ( '' !== $heading ) : ?><h2 class="ggm-ws-section-heading"><?php echo esc_html( $heading ); ?></h2><?php endif; ?>
+			<?php if ( $has_rich_content ) : ?><div class="ggm-ws-form-text__content"><?php echo wp_kses_post( wpautop( $content ) ); ?></div><?php endif; ?>
+		</section>
+		<?php
+		return ob_get_clean();
 	}
 
 	/**
@@ -1494,7 +1614,7 @@ class GGM_Shortcodes {
 		ob_start();
 		echo '<section class="ggm-ws-block ggm-ws-block--discover">';
 		if ( $this->show_workshop_block_heading( $atts['show_heading'] ) ) {
-			echo '<h2 class="ggm-ws-block__heading ggm-ws-discover__section-heading">' . esc_html( ggm_get_workshop_block_heading( 'discover', $workshop_id ) ) . '</h2>';
+			echo '<h2 class="ggm-ws-section-heading">' . esc_html( ggm_get_workshop_block_heading( 'discover', $workshop_id ) ) . '</h2>';
 		}
 		echo '<div class="ggm-ws-discover' . esc_attr( $layout['class'] ) . '"' . $layout['style'] . '>';
 		foreach ( $rows as $row ) {
@@ -1746,7 +1866,7 @@ class GGM_Shortcodes {
 		ob_start();
 		echo '<section class="ggm-ws-block ggm-ws-block--perfect-for">';
 		if ( $this->show_workshop_block_heading( $atts['show_heading'] ) ) {
-			echo '<h2 class="ggm-ws-block__heading ggm-ws-perfect-for__section-heading">' . esc_html( ggm_get_workshop_block_heading( 'perfect_for', $workshop_id ) ) . '</h2>';
+			echo '<h2 class="ggm-ws-section-heading">' . esc_html( ggm_get_workshop_block_heading( 'perfect_for', $workshop_id ) ) . '</h2>';
 		}
 		echo '<div class="ggm-ws-perfect-for' . esc_attr( $layout['class'] ) . '"' . $layout['style'] . '>';
 		foreach ( $rows as $row ) {
@@ -1984,7 +2104,7 @@ class GGM_Shortcodes {
 	/**
 	 * Fixed inline SVG/glyph icons for the icon list (stroke = currentColor).
 	 *
-	 * @param string $name calendar|clock|video|rupee|language
+	 * @param string $name calendar|clock|video|rupee|language|money
 	 * @return string
 	 */
 	private function icon_svg( $name ) {
@@ -1994,6 +2114,7 @@ class GGM_Shortcodes {
 
 		$icons = array(
 			'calendar' => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>',
+			'money'    => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="24" height="24"><rect x="2.5" y="5.5" width="19" height="13" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M6.5 12h.01M17.5 12h.01"/></svg>',
 			'clock'    => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l4 2"/></svg>',
 			'video'    => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><rect x="2" y="6" width="14" height="12" rx="2"/><path d="M16 10l6-3v10l-6-3"/></svg>',
 			'language' => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.5 3.8 5.7 3.8 9s-1.3 6.5-3.8 9c-2.5-2.5-3.8-5.7-3.8-9s1.3-6.5 3.8-9z"/></svg>',

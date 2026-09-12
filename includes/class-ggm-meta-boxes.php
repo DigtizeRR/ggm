@@ -206,6 +206,8 @@ class GGM_Meta_Boxes {
 		$booking_card_hero_items = is_array( $booking_card_hero_items ) ? array_slice( $booking_card_hero_items, 0, 4 ) : array();
 		$booking_card_testimonial_text = get_post_meta( $post->ID, 'ggm_workshop_booking_card_testimonial_text', true );
 		$booking_card_rating_text      = get_post_meta( $post->ID, 'ggm_workshop_booking_card_rating_text', true );
+		$form_text_heading              = get_post_meta( $post->ID, 'ggm_workshop_form_text_heading', true );
+		$form_text_content              = get_post_meta( $post->ID, 'ggm_workshop_form_text_content', true );
 		$additional_block_layouts      = get_post_meta( $post->ID, 'ggm_workshop_additional_block_layouts', true );
 		$additional_block_layouts      = is_array( $additional_block_layouts ) ? $additional_block_layouts : array();
 		$linked_course_id    = (int) get_post_meta( $post->ID, 'linked_course_id', true );
@@ -490,6 +492,16 @@ class GGM_Meta_Boxes {
 					<th><label><?php esc_html_e( 'Featured Image', 'ggm-member-dashboard' ); ?></label></th>
 					<td>
 						<p class="description"><?php esc_html_e( 'Use the "Featured Image" panel in the sidebar of this edit screen — it\'s used everywhere a workshop thumbnail is shown (dashboard, archive, single page).', 'ggm-member-dashboard' ); ?></p>
+					</td>
+				</tr>
+				<tr>
+					<th><label for="ggm-workshop-form-text-heading"><?php esc_html_e( 'Form Text', 'ggm-member-dashboard' ); ?></label></th>
+					<td>
+						<p><strong><?php esc_html_e( 'Heading', 'ggm-member-dashboard' ); ?></strong></p>
+						<input type="text" name="ggm_workshop_form_text_heading" id="ggm-workshop-form-text-heading" value="<?php echo esc_attr( $form_text_heading ); ?>" class="large-text" placeholder="<?php esc_attr_e( 'Ready to Decode Your Glow?', 'ggm-member-dashboard' ); ?>">
+						<p><strong><?php esc_html_e( 'Content', 'ggm-member-dashboard' ); ?></strong></p>
+						<?php wp_editor( $form_text_content, 'ggm-workshop-form-text-content-editor', array( 'textarea_name' => 'ggm_workshop_form_text_content', 'textarea_rows' => 10, 'media_buttons' => true, 'teeny' => false, 'quicktags' => true ) ); ?>
+						<p class="description"><?php esc_html_e( 'Add formatted supporting text and place it with [ggm_workshop_form_text]. Both fields are optional.', 'ggm-member-dashboard' ); ?></p>
 					</td>
 				</tr>
 				<tr>
@@ -1914,6 +1926,27 @@ class GGM_Meta_Boxes {
 				delete_post_meta( $post_id, 'ggm_workshop_booking_card_hero_header' );
 			} else {
 				update_post_meta( $post_id, 'ggm_workshop_booking_card_hero_header', $hero_header );
+			}
+		}
+
+		if ( array_key_exists( 'ggm_workshop_form_text_heading', $_POST ) ) {
+			$form_text_heading_raw = wp_unslash( $_POST['ggm_workshop_form_text_heading'] );
+			$form_text_heading     = is_scalar( $form_text_heading_raw ) ? trim( sanitize_text_field( (string) $form_text_heading_raw ) ) : '';
+			if ( '' === $form_text_heading ) {
+				delete_post_meta( $post_id, 'ggm_workshop_form_text_heading' );
+			} else {
+				update_post_meta( $post_id, 'ggm_workshop_form_text_heading', $form_text_heading );
+			}
+		}
+
+		if ( array_key_exists( 'ggm_workshop_form_text_content', $_POST ) ) {
+			$form_text_content_raw = wp_unslash( $_POST['ggm_workshop_form_text_content'] );
+			$form_text_content     = is_scalar( $form_text_content_raw ) ? wp_kses_post( (string) $form_text_content_raw ) : '';
+			$has_rich_content  = '' !== trim( wp_strip_all_tags( $form_text_content ) ) || (bool) preg_match( '/<(?:audio|figure|gallery|img|video)\b/i', $form_text_content );
+			if ( ! $has_rich_content ) {
+				delete_post_meta( $post_id, 'ggm_workshop_form_text_content' );
+			} else {
+				update_post_meta( $post_id, 'ggm_workshop_form_text_content', $form_text_content );
 			}
 		}
 
