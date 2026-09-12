@@ -9,13 +9,18 @@ define( 'ABSPATH', dirname( __DIR__ ) );
 
 $GLOBALS['ggm_test_meta'] = array();
 $GLOBALS['ggm_test_price'] = array( 'type' => 'sale', 'regular' => 7000, 'sale' => 1400 );
+$GLOBALS['ggm_test_current_id'] = 77;
+$GLOBALS['ggm_test_queried_id'] = 77;
+$GLOBALS['ggm_test_shortcodes'] = array();
 
 function shortcode_atts( $defaults, $atts, $shortcode = '' ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed
 	return array_merge( $defaults, $atts );
 }
 function absint( $value ) { return abs( (int) $value ); }
-function get_the_ID() { return 77; }
+function get_the_ID() { return $GLOBALS['ggm_test_current_id']; }
+function get_queried_object_id() { return $GLOBALS['ggm_test_queried_id']; }
 function get_post_type( $post_id ) { return 77 === (int) $post_id ? 'workshop' : 'post'; }
+function add_shortcode( $tag, $callback ) { $GLOBALS['ggm_test_shortcodes'][ $tag ] = $callback; }
 function get_post_meta( $post_id, $key, $single = true ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed
 	return $GLOBALS['ggm_test_meta'][ $key ] ?? '';
 }
@@ -92,6 +97,9 @@ $GLOBALS['ggm_test_meta'] = array(
 );
 
 $shortcodes = new GGM_Shortcodes();
+$shortcodes->init();
+$assert( isset( $GLOBALS['ggm_test_shortcodes']['ggm_workshop_booking_summary'] ), 'Legacy standalone booking-summary shortcode is not registered.' );
+$assert( isset( $GLOBALS['ggm_test_shortcodes']['ggm_workshop_booking_card_summary'] ), 'Booking-card summary shortcode is not registered.' );
 $sale_html  = $shortcodes->sc_workshop_booking_card( array( 'id' => 77 ) );
 $assert( 1 === substr_count( $sale_html, 'class="ggm-workshop-booking-summary"' ), 'Booking card must use the shared compact summary surface.' );
 $assert( false !== strpos( $sale_html, 'Sept 24–30, 2026' ), 'Same-month compact date range failed.' );
@@ -113,6 +121,14 @@ $assert( strpos( $compact_summary_html, 'ggm-workshop-booking-summary__divider' 
 $assert( false !== strpos( $compact_summary_html, '₹1,400' ) && false !== strpos( $compact_summary_html, '₹7,000' ), 'Standalone booking summary prices failed.' );
 $assert( false !== strpos( $compact_summary_html, 'You Save ₹5,600' ), 'Standalone booking summary saving failed.' );
 $assert( false === strpos( $compact_summary_html, 'ggm-workshop-booking-card__button' ), 'Standalone booking summary must not include the existing CTA.' );
+$booking_card_summary_html = $shortcodes->sc_workshop_booking_card_summary( array( 'id' => 77 ) );
+$assert( $compact_summary_html === $booking_card_summary_html, 'The booking-card summary shortcode must use the exact shared renderer.' );
+$GLOBALS['ggm_test_current_id'] = 999;
+$GLOBALS['ggm_test_queried_id'] = 77;
+$invalid_placeholder_html = $shortcodes->sc_workshop_booking_card_summary( array( 'id' => 123 ) );
+$assert( false !== strpos( $invalid_placeholder_html, 'ggm-workshop-booking-summary' ), 'An invalid placeholder ID must fall back to the current queried Workshop.' );
+$GLOBALS['ggm_test_current_id'] = 77;
+$GLOBALS['ggm_test_queried_id'] = 77;
 $booking_summary_classes = array();
 $standalone_summary_classes = array();
 preg_match_all( '/ggm-workshop-booking-summary(?:__(?:[a-z-]+)|--(?:[a-z-]+))?/', $sale_html, $booking_summary_classes );
@@ -162,11 +178,15 @@ $GLOBALS['ggm_test_meta'] = array();
 $assert( '' === $shortcodes->sc_workshop_form_text( array( 'id' => 77 ) ), 'Empty Form Text must render nothing.' );
 
 $css = file_get_contents( dirname( __DIR__ ) . '/assets/css/ggm-public.css' );
+$shortcode_source = file_get_contents( dirname( __DIR__ ) . '/public/class-ggm-shortcodes.php' );
 $assert( false !== strpos( $css, '.ggm-workshop-booking-summary {' ), 'Standalone compact booking-summary CSS is missing.' );
 $assert( false !== strpos( $css, 'grid-template-columns: minmax(0, 1fr) 1px minmax(0, 1fr);' ), 'Summary divider must own the exact centre grid column.' );
 $assert( false === strpos( $css, '.ggm-workshop-booking-card__summary' ), 'Legacy duplicate booking-card summary CSS must be removed.' );
 $assert( false === strpos( $css, '@container ggm-booking-card' ), 'A legacy breakpoint must not split the shared summary.' );
 $assert( false !== strpos( $css, '.ggm-ws-form-text__content img' ), 'Responsive Form Text media CSS is missing.' );
+$assert( 7 === substr_count( $shortcode_source, '<h2 class="ggm-ws-section-heading">' ), 'Every workshop section main heading must use the one shared CSS class.' );
+$assert( 1 === preg_match( '/\.ggm-ws-section-heading\s*\{[^}]*text-align:\s*center\s*!important;/s', $css ), 'Shared workshop section headings must be centred.' );
+$assert( 1 === preg_match( '/\.ggm-ws-why-workshop-different\s+\.ggm-ws-section-heading\s*\{[^}]*text-align:\s*left\s*!important;/s', $css ), 'The Why Workshop Is Different heading must retain its scoped left alignment.' );
 
 $meta_box_source = file_get_contents( dirname( __DIR__ ) . '/includes/class-ggm-meta-boxes.php' );
 $assert( false !== strpos( $meta_box_source, "wp_editor( \$form_text_content, 'ggm-workshop-form-text-content-editor'" ), 'Full Form Text editor is missing from Workshop Details.' );

@@ -72,6 +72,7 @@ class GGM_Shortcodes {
 		add_shortcode( 'ggm_workshop_contribution_detail', array( $this, 'sc_workshop_contribution_detail' ) );
 		add_shortcode( 'ggm_workshop_booking_card', array( $this, 'sc_workshop_booking_card' ) );
 		add_shortcode( 'ggm_workshop_booking_summary', array( $this, 'sc_workshop_booking_summary' ) );
+		add_shortcode( 'ggm_workshop_booking_card_summary', array( $this, 'sc_workshop_booking_card_summary' ) );
 		add_shortcode( 'ggm_workshop_booking_card_hero_header', array( $this, 'sc_workshop_booking_card_hero_header' ) );
 		add_shortcode( 'ggm_workshop_form_text', array( $this, 'sc_workshop_form_text' ) );
 	}
@@ -674,7 +675,34 @@ class GGM_Shortcodes {
 	 * @return int
 	 */
 	private function resolve_workshop_id( array $atts ) {
-		return absint( $atts['id'] ?? 0 ) ?: (int) get_the_ID();
+		$explicit_id = absint( $atts['id'] ?? 0 );
+		if ( $explicit_id && in_array( get_post_type( $explicit_id ), array( 'workshop', 'ggm_workshop' ), true ) ) {
+			return $explicit_id;
+		}
+
+		// Elementor can make get_the_ID() point at the template document instead
+		// of the Workshop being previewed. Reuse its context-aware resolver when
+		// available, then fall back to the normal queried/current post candidates.
+		if ( class_exists( 'GGM_Elementor' ) && method_exists( 'GGM_Elementor', 'resolve_current_workshop_id' ) ) {
+			$elementor_id = absint( GGM_Elementor::resolve_current_workshop_id() );
+			if ( $elementor_id ) {
+				return $elementor_id;
+			}
+		}
+
+		$candidates = array();
+		if ( function_exists( 'get_queried_object_id' ) ) {
+			$candidates[] = get_queried_object_id();
+		}
+		$candidates[] = get_the_ID();
+
+		foreach ( array_unique( array_filter( array_map( 'absint', $candidates ) ) ) as $post_id ) {
+			if ( in_array( get_post_type( $post_id ), array( 'workshop', 'ggm_workshop' ), true ) ) {
+				return $post_id;
+			}
+		}
+
+		return 0;
 	}
 
 	/**
@@ -1532,6 +1560,17 @@ class GGM_Shortcodes {
 		</div>
 		<?php
 		return ob_get_clean();
+	}
+
+	/**
+	 * [ggm_workshop_booking_card_summary id="" class="" date_format=""]
+	 *
+	 * Render only the booking card's shared date-and-price section. The legacy
+	 * booking-summary shortcode remains registered as a backwards-compatible
+	 * alias, and both entry points use the same renderer and CSS classes.
+	 */
+	public function sc_workshop_booking_card_summary( $atts ) {
+		return $this->sc_workshop_booking_summary( $atts );
 	}
 
 	/**

@@ -1563,6 +1563,12 @@
   font-style: normal;
   font-weight: 600;
   line-height: 38px;
+  text-align: center !important;
+}
+
+/* This editorial two-column section intentionally keeps its heading aligned
+   with the body copy. Every other shortcode section heading remains centred. */
+.ggm-ws-why-workshop-different .ggm-ws-section-heading {
   text-align: left !important;
 }
 
@@ -3659,7 +3665,6 @@ border-color: rgb(114 184 50 / 55%);
     font-style: normal !important;
     font-weight: 600 !important;
     line-height: 28px !important;
-    text-align: left !important;
   }
 
   .ggm-ws-block--discover .ggm-ws-discover,
