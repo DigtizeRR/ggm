@@ -3386,10 +3386,20 @@ border-color: rgb(114 184 50 / 55%);
   .ggm-ws-journey__day:nth-child(4n)::after { display: block; }
   .ggm-ws-journey__day:nth-child(3n)::before,
   .ggm-ws-journey__day:nth-child(3n)::after { display: none; }
-  .ggm-ws-journey__card { min-height: 128px; padding: 18px 10px; }
+  .ggm-ws-journey__card {  }
+
+  .ggm-ws-journey__day:not(:last-child)::after {
+    top: 150%;
+    left: -2%;
+    height: 2px;
+    transform: rotate(270deg);
+}
+.ggm-ws-journey__day:not(:last-child)::before {
+    left: 48.9%;
+}
 }
 @media (max-width: 420px) {
-  .ggm-ws-journey__page { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ggm-ws-journey__page { grid-template-columns: repeat(1, minmax(0, 1fr)); }
   .ggm-ws-journey__day:nth-child(3n)::before,
   .ggm-ws-journey__day:nth-child(3n)::after { display: block; }
   .ggm-ws-journey__day:nth-child(2n)::before,
