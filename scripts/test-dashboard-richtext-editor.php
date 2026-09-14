@@ -1,0 +1,4 @@
+<?php
+$root=dirname(__DIR__);$workshop=file_get_contents($root.'/templates/dashboard/admin/partials/workshop-editor-schema.php');$course=file_get_contents($root.'/templates/dashboard/admin/course-editor.php');$public=file_get_contents($root.'/public/class-ggm-public.php');$service=file_get_contents($root.'/modules/course/class-ggm-course-data-service.php');
+$checks=array('Workshop content uses wp_editor'=>false!==strpos($workshop,"wp_editor( '', 'ggm-dashboard-workshop-content'"),'Workshop form content uses wp_editor'=>false!==strpos($workshop,"wp_editor( '', 'ggm-dashboard-workshop-form-text'"),'Course content uses wp_editor'=>false!==strpos($course,"wp_editor( '', 'ggm-dashboard-course-content'"),'Editor assets are administrator-scoped'=>false!==strpos($public,'wp_enqueue_editor();'),'Post content preserves allowed HTML'=>false!==strpos($service,'wp_kses_post'));
+foreach($checks as $label=>$pass){echo($pass?'PASS':'FAIL').": $label\n";if(!$pass)exit(1);}

@@ -39,7 +39,7 @@ body {
 	overflow-x: hidden;
 }
 
-#ggm-dash *, #ggm-dash *::before, #ggm-dash *::after {
+#ggm-dash *:not(.wp-editor-wrap):not(.wp-editor-wrap *), #ggm-dash *:not(.wp-editor-wrap):not(.wp-editor-wrap *)::before, #ggm-dash *:not(.wp-editor-wrap):not(.wp-editor-wrap *)::after {
 	box-sizing: border-box;
 }
 
@@ -75,6 +75,31 @@ body {
 	gap: 6px;
 	flex-grow: 1;
 }
+
+#ggm-dash .ggm-dash-nav-divider { margin: 14px 10px 4px; color: #718096; font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+#ggm-dash .ggm-management-panel, #ggm-dash .ggm-management-editor { max-width: 1100px; margin: 0 auto; background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 24px; }
+#ggm-dash .ggm-management-head, #ggm-dash .ggm-management-filters, #ggm-dash .ggm-management-actions { display:flex; gap:12px; align-items:center; justify-content:space-between; flex-wrap:wrap; margin-bottom:18px; }
+#ggm-dash .ggm-management-filters > input, #ggm-dash .ggm-management-filters > select, #ggm-dash .ggm-management-editor label > input, #ggm-dash .ggm-management-editor label > textarea:not(.wp-editor-area), #ggm-dash .ggm-management-editor label > select { width:100%; max-width:500px; border:1px solid #cbd5e0; border-radius:8px; padding:10px; font:inherit; }
+#ggm-dash .ggm-management-editor label { display:block; margin:14px 0; font-weight:600; }
+#ggm-dash .ggm-management-editor label > input, #ggm-dash .ggm-management-editor label > textarea:not(.wp-editor-area), #ggm-dash .ggm-management-editor label > select { display:block; margin-top:6px; max-width:none; font-weight:400; }
+#ggm-dash .ggm-management-editor .wp-editor-wrap { display:block; width:100%; min-width:0; max-width:100%; margin-top:6px; }
+#ggm-dash .ggm-management-editor .wp-editor-container, #ggm-dash .ggm-management-editor .wp-editor-tools, #ggm-dash .ggm-management-editor .wp-editor-area, #ggm-dash .ggm-management-editor .mce-container, #ggm-dash .ggm-management-editor .quicktags-toolbar { max-width:100%; min-width:0; }
+@media (max-width:700px) { #ggm-dash .ggm-management-editor .mce-toolbar-grp { overflow-x:auto; overflow-y:hidden; -webkit-overflow-scrolling:touch; } }
+#ggm-dash .ggm-management-results { overflow-x:auto; } #ggm-dash .ggm-management-results table { width:100%; border-collapse:collapse; } #ggm-dash .ggm-management-results th,#ggm-dash .ggm-management-results td { text-align:left; padding:12px; border-bottom:1px solid #e2e8f0; }
+#ggm-dash .ggm-payment-table-wrap { max-width:100%; overflow-x:auto; } #ggm-dash .ggm-payments-panel code { font-size:11px; white-space:nowrap; } #ggm-dash .ggm-payments-panel [hidden] { display:none; }
+#ggm-dash .ggm-management-notice { min-height:22px; color:#0e9e6e; font-weight:600; } #ggm-dash .ggm-management-error { color:#c53030; } #ggm-dash .ggm-management-editor details { margin:16px 0; padding:14px; background:#f7fafc; border-radius:8px; } #ggm-dash .ggm-management-editor summary { cursor:pointer; font-weight:700; }
+@media (max-width: 700px) { #ggm-dash .ggm-management-panel, #ggm-dash .ggm-management-editor { padding:16px; border-radius:0; border-left:0; border-right:0; } #ggm-dash .ggm-management-head { align-items:flex-start; } #ggm-dash .ggm-management-results th, #ggm-dash .ggm-management-results td { white-space:nowrap; padding:9px; } }
+
+#ggm-dash .ggm-workshop-section { margin: 22px 0; padding: 20px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; }
+#ggm-dash .ggm-workshop-section h3 { margin: 0 0 16px; color: #1a365d; }
+#ggm-dash .ggm-workshop-grid, #ggm-dash .ggm-workshop-section [data-ggm-pricing], #ggm-dash .ggm-workshop-section [data-ggm-booking] { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+#ggm-dash .ggm-repeat-card, #ggm-dash .ggm-slot-card { margin: 12px 0; padding: 14px; background: #fff; border: 1px solid #dbe4ee; border-radius: 10px; }
+#ggm-dash .ggm-repeat-card label, #ggm-dash .ggm-slot-card label { display: inline-block; min-width: 170px; margin: 6px; }
+#ggm-dash .ggm-media-control { margin: 10px 0; padding: 10px; background: #fff; border: 1px dashed #a0aec0; border-radius: 8px; }
+#ggm-dash .ggm-media-preview { width: 120px; height: 80px; margin: 8px 0; display:flex; align-items:center; justify-content:center; overflow:hidden; background:#edf2f7; color:#718096; }
+#ggm-dash .ggm-media-preview img { max-width: 100%; max-height: 100%; object-fit: cover; }
+#ggm-dash .ggm-workshop-editor button:focus-visible, #ggm-dash .ggm-workshop-editor input:focus-visible, #ggm-dash .ggm-workshop-editor select:focus-visible, #ggm-dash .ggm-workshop-editor textarea:focus-visible { outline: 3px solid #63b3ed; outline-offset: 2px; }
+@media (max-width:700px){#ggm-dash .ggm-workshop-grid,#ggm-dash .ggm-workshop-section [data-ggm-pricing],#ggm-dash .ggm-workshop-section [data-ggm-booking]{grid-template-columns:1fr;}#ggm-dash .ggm-repeat-card label,#ggm-dash .ggm-slot-card label{display:block;min-width:0;margin:8px 0;}}
 
 #ggm-dash .ggm-dash-nav-item {
 	display: flex;
@@ -164,6 +189,15 @@ body {
 		overflow: hidden;
 	}
 
+	/* Keep the branding and Logout fixed while long navigation remains reachable. */
+	#ggm-dash .ggm-dash-nav {
+		min-height: 0;
+		overflow-x: hidden;
+		overflow-y: auto;
+		overscroll-behavior: contain;
+		-webkit-overflow-scrolling: touch;
+	}
+
 	#ggm-dash .ggm-dash-main-container {
 		height: 100%;
 		min-height: 0;
@@ -178,6 +212,22 @@ body {
 		-webkit-overflow-scrolling: touch;
 	}
 }
+
+/* Administrator-only Home overview. */
+#ggm-dash .ggm-admin-overview { max-width: 1180px; margin: 0 auto 28px; }
+#ggm-dash .ggm-admin-overview-heading { display:flex; align-items:end; justify-content:space-between; margin-bottom:14px; }
+#ggm-dash .ggm-admin-overview-kicker { margin:0 0 3px; color:var(--ggm-dash-primary,#0e9e6e); font-size:12px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
+#ggm-dash .ggm-admin-overview h2 { margin:0; color:#1a365d; font-size:26px; }
+#ggm-dash .ggm-admin-overview-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:16px; }
+#ggm-dash .ggm-admin-overview-card { display:flex; min-width:0; flex-direction:column; align-items:flex-start; padding:20px; border:1px solid #dbe7e3; border-radius:14px; background:#fff; box-shadow:0 4px 14px rgba(15,23,42,.05); }
+#ggm-dash .ggm-admin-overview-card > .dashicons { width:38px; height:38px; margin-bottom:12px; padding:9px; border-radius:10px; background:#e6f7f0; color:var(--ggm-dash-primary,#0e9e6e); font-size:20px; }
+#ggm-dash .ggm-admin-overview-card p { margin:0; color:#64748b; font-size:14px; font-weight:700; }
+#ggm-dash .ggm-admin-overview-card strong { margin:5px 0 16px; color:#1e293b; font-size:30px; line-height:1; }
+#ggm-dash .ggm-admin-overview-link { width:100%; min-height:40px; margin-top:auto; padding:8px 12px; font-size:13px; }
+#ggm-dash .ggm-admin-overview-card button.ggm-admin-overview-link { display:inline-flex; gap:0; border-radius:8px; text-align:center; }
+#ggm-dash .ggm-admin-overview-error { max-width:1180px; margin:0 auto 24px; padding:14px 16px; border:1px solid #f0c7c7; border-radius:10px; background:#fff5f5; color:#9b2c2c; }
+@media (max-width:1100px) and (min-width:701px) { #ggm-dash .ggm-admin-overview-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media (max-width:700px) { #ggm-dash .ggm-admin-overview { margin-bottom:22px; } #ggm-dash .ggm-admin-overview-grid { grid-template-columns:1fr; gap:12px; } #ggm-dash .ggm-admin-overview-card { padding:16px; } }
 
 /* Focused course mode: the course outline replaces the dashboard sidebar. */
 @media (min-width: 769px) {
@@ -1561,9 +1611,9 @@ body {
 
 /* ── Shadow-free dashboard and form shortcode output ───────────────────── */
 #ggm-dash,
-#ggm-dash *,
-#ggm-dash *::before,
-#ggm-dash *::after,
+#ggm-dash :not(.wp-editor-wrap):not(.wp-editor-wrap *),
+#ggm-dash :not(.wp-editor-wrap):not(.wp-editor-wrap *)::before,
+#ggm-dash :not(.wp-editor-wrap):not(.wp-editor-wrap *)::after,
 .ggm-built-form,
 .ggm-built-form *,
 .ggm-built-form *::before,
@@ -1589,7 +1639,7 @@ body {
 	text-shadow: none !important;
 }
 
-#ggm-dash :is(a[href], button, input:not([type="hidden"]), select, textarea, [tabindex]):focus-visible {
+#ggm-dash :is(a[href], button, input:not([type="hidden"]), select, textarea, [tabindex]):not(.wp-editor-wrap *):focus-visible {
 	outline: 3px solid #08734f !important;
 	outline-offset: 2px;
 }

@@ -14,6 +14,27 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+// Shared with Dashboard Members: this is the one membership data source.
+$ggm_members_result = GGM_Member_Data_Service::query( array(
+	'search'      => isset( $_GET['s'] ) ? wp_unslash( $_GET['s'] ) : '',
+	'workshop_id' => $_GET['workshop_id'] ?? 0,
+	'page'        => $_GET['paged'] ?? 1,
+) );
+if ( is_wp_error( $ggm_members_result ) ) {
+	wp_die( esc_html( $ggm_members_result->get_error_message() ) );
+}
+$search      = $ggm_members_result['search'];
+$workshop_id = $ggm_members_result['workshop_id'];
+$paged       = $ggm_members_result['page'];
+$per_page    = $ggm_members_result['per_page'];
+$total       = $ggm_members_result['total'];
+$pages       = $ggm_members_result['pages'];
+$rows        = $ggm_members_result['rows'];
+$filter_workshops = get_posts( array( 'post_type' => array( 'workshop', 'ggm_workshop' ), 'post_status' => array( 'publish', 'private', 'draft', 'pending', 'future' ), 'posts_per_page' => -1, 'orderby' => 'title', 'order' => 'ASC' ) );
+$assign_workshops = get_posts( array( 'post_type' => array( 'workshop', 'ggm_workshop' ), 'post_status' => 'publish', 'numberposts' => -1, 'orderby' => 'title', 'order' => 'ASC' ) );
+$assign_courses   = get_posts( array( 'post_type' => 'course', 'post_status' => 'publish', 'numberposts' => -1, 'orderby' => 'title', 'order' => 'ASC' ) );
+goto ggm_members_view;
+
 global $wpdb;
 
 // ── Search ────────────────────────────────────────────────────────────────────
@@ -187,6 +208,7 @@ if ( ! empty( $user_ids ) ) {
 	}
 }
 
+ggm_members_view:
 // ── Page URL helper ───────────────────────────────────────────────────────────
 $base_url = add_query_arg(
 	array( 'page' => sanitize_key( $_GET['page'] ?? 'ggm-members' ) ),

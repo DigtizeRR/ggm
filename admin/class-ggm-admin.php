@@ -678,6 +678,9 @@ class GGM_Admin {
 		}
 
 		wp_enqueue_media();
+		if ( false !== strpos( $hook, 'ggm-lms-settings' ) ) {
+			wp_enqueue_script( 'jquery-ui-sortable' );
+		}
 
 		wp_enqueue_style( 'wp-color-picker' );
 
@@ -785,6 +788,12 @@ class GGM_Admin {
 		if ( isset( $_POST['settings'] ) && is_array( $_POST['settings'] ) ) {
 			foreach ( wp_unslash( $_POST['settings'] ) as $key => $val ) {
 				$key = sanitize_key( $key );
+				if ( 'ggm_workshop_admin_configuration' === $key ) {
+					$form_data[ $key ] = class_exists( 'GGM_Workshop_Admin_Config' )
+						? GGM_Workshop_Admin_Config::sanitise_submitted( $val )
+						: array();
+					continue;
+				}
 				if ( in_array( $key, $currency_setting_keys, true ) ) {
 					$clear_currency_rates = true;
 				}

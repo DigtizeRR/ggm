@@ -98,6 +98,12 @@
 				switchTab('free');
 			});
 
+			// Administrator overview cards reuse the established protected tabs.
+			$(document).on('click', '.ggm-admin-overview-link[data-tab]', function(e) {
+				e.preventDefault();
+				switchTab($(this).data('tab'));
+			});
+
 			// A shareable server-side link uses ?ggm_tab=health so the target
 			// survives the login redirect. Normal in-dashboard navigation keeps
 			// using the existing #tab-* hashes.
@@ -570,6 +576,37 @@
 		function openCoursePlayer(courseId, lessonId) {
 			var course = findCourse(courseId);
 			if (!course) return;
+			// The Home request deliberately contains card data only. Fetch one
+			// course's lesson bodies/videos on demand instead of serializing every
+			// Administrator-accessible course during dashboard initialization.
+			if (!course.lessons_loaded) {
+				if (course.lessons_loading) return;
+				course.lessons_loading = true;
+				$('#ggm-courses-list').html('<div class="ggm-home-section"><div class="ggm-empty"><p>Loading course lessons…</p></div></div>');
+				$.ajax({
+					url: ggm_public.ajaxurl || ggm_public.ajax_url,
+					type: 'POST',
+					dataType: 'json',
+					data: { action: 'ggm_dashboard_course_lessons', nonce: ggm_public.nonce, course_id: course.id },
+					timeout: 30000
+				}).done(function(response) {
+					if (!response || !response.success || !response.data) {
+						course.lessons_loading = false;
+						$('#ggm-courses-list').html('<div class="ggm-error-alert"><p>Unable to load this course. Please try again.</p></div>');
+						return;
+					}
+					course.lessons = response.data.lessons || [];
+					course.lessons_loaded = true;
+					course.lessons_loading = false;
+					course.completed_count = course.lessons.filter(function(lesson) { return lesson.completed; }).length;
+					course.progress = course.lessons.length ? Math.round((course.completed_count / course.lessons.length) * 100) : 0;
+					openCoursePlayer(course.id, lessonId);
+				}).fail(function() {
+					course.lessons_loading = false;
+					$('#ggm-courses-list').html('<div class="ggm-error-alert"><p>Unable to load this course. Please try again.</p></div>');
+				});
+				return;
+			}
 			$('#ggm-dash').addClass('ggm-course-mode');
 			var lessons = course.lessons || [];
 			var activeIndex = 0;

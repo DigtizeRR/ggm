@@ -215,14 +215,7 @@ if (
 	wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['_wpnonce'] ) ), 'ggm_refund_' . absint( $_POST['payment_id'] ) )
 ) {
 	$pid = absint( $_POST['payment_id'] );
-	$wpdb->update(
-		$wpdb->prefix . 'ggm_payments',
-		array( 'status' => 'refunded' ),
-		array( 'id'     => $pid ),
-		array( '%s' ),
-		array( '%d' )
-	);
-	GGM_Credit::restore_for_refund( $pid );
+	GGM_Payment_Admin_Service::refund( $pid );
 	wp_safe_redirect( add_query_arg( array( 'refunded' => 1 ), remove_query_arg( array( 'ggm_action', 'payment_id', '_wpnonce' ) ) ) );
 	exit;
 }

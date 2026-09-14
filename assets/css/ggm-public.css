@@ -1172,9 +1172,9 @@
   white-space: nowrap;
 }
 .ggm-workshop-booking-summary__divider {
-  width: 1px;
-  height: clamp(42px, 10cqi, 66px);
-  background: #cfd6cf;
+    width: 1px;
+    height: clamp(42px, 10cqi, 66px);
+    background: #ededed;
 }
 .ggm-workshop-booking-summary__price-section {
   display: grid;
@@ -1555,15 +1555,15 @@
 
 /* One shared main-heading system for every workshop section shortcode. */
 .ggm-ws-section-heading {
-  display: block;
-  margin: 0 0 28px;
-  color: inherit;
-  font-family: "Space Grotesk", sans-serif;
-  font-size: 32px;
-  font-style: normal;
-  font-weight: 600;
-  line-height: 38px;
-  text-align: center !important;
+    /* display: block; */
+    margin: 0 0 25px;
+    /* color: inherit; */
+    /* font-family: "Space Grotesk", sans-serif; */
+    /* font-size: 32px; */
+    /* font-style: normal; */
+    /* font-weight: 600; */
+    /* line-height: 38px; */
+    text-align: center !important;
 }
 
 /* This editorial two-column section intentionally keeps its heading aligned
@@ -2229,24 +2229,19 @@ border-color: rgb(114 184 50 / 55%);
 .ggm-ws-join-form-full__name,
 .ggm-ws-join-form-full__email,
 .ggm-ws-join-form-full__phone {
-  box-sizing: border-box;
-  padding: 16px 20px;
-  border: 1.5px solid #a3d9a5 !important;
-  border-radius: 14px !important;
-  background: #fff !important;
-  box-shadow: none !important;
-
-  /* 16px+ is required to stop iOS Safari auto-zooming the whole
-			   page in when this field is focused — below that threshold the
-			   browser zooms the viewport, which is what made these fields
-			   look huge/broken on mobile. */
-  font-size: 16px;
-  line-height: 1.4;
-  color: #334155;
-  outline: none !important;
-  -webkit-appearance: none;
-  appearance: none;
-  transition: border-color 0.15s ease;
+    box-sizing: border-box;
+    padding: 16px 20px;
+    border: 1px solid #ededed !important;
+    border-radius: 10px !important;
+    background: #fff !important;
+    box-shadow: none !important;
+    font-size: 16px;
+    line-height: 1.4;
+    color: #334155;
+    outline: none !important;
+    -webkit-appearance: none;
+    appearance: none;
+    transition: border-color 0.15s ease;
 }
 .ggm-ws-join-form-full__input-wrap .ggm-ws-join-form-full__name,
 .ggm-ws-join-form-full__input-wrap .ggm-ws-join-form-full__email {
@@ -3359,6 +3354,7 @@ border-color: rgb(114 184 50 / 55%);
     background: linear-gradient(145deg, #ecf1dd, #f4fff8);
     color: #393231;
     box-shadow: 0 2px 7px rgb(95 64 52 / 8%), 0 1px 3px rgb(95 64 52 / 4%);
+    z-index: 1;
 }
 .ggm-ws-journey__card strong { font-size: 18px;
     font-weight: 600;
@@ -3670,12 +3666,8 @@ border-color: rgb(114 184 50 / 55%);
   }
 
   .ggm-ws-section-heading {
-    font-family: "Space Grotesk", sans-serif !important;
     font-size: 25px !important;
-    font-style: normal !important;
-    font-weight: 600 !important;
-    line-height: 28px !important;
-  }
+  } 
 
   .ggm-ws-block--discover .ggm-ws-discover,
   .ggm-ws-block--discover .ggm-ws-discover.ggm-ws-layout--custom {

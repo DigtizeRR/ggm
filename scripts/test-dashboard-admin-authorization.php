@@ -1,0 +1,4 @@
+<?php
+$root = dirname( __DIR__ ); $source = file_get_contents( $root . '/modules/dashboard/class-ggm-dashboard-management.php' ); $layout = file_get_contents( $root . '/templates/dashboard/layout.php' );
+$checks = array('Capability required' => false !== strpos($source,"current_user_can( 'manage_options' )"),'Administrator role required' => false !== strpos($source,"'administrator'"),'Every endpoint authorizes' => substr_count($source,'$this->authorize();') >= 8,'No public management AJAX' => false === strpos($source,'wp_ajax_nopriv_ggm_dashboard_management_'),'UI is conditionally rendered' => false !== strpos($layout,'$is_dashboard_administrator'));
+foreach($checks as $label=>$pass){echo ($pass?'PASS':'FAIL').": $label\n";if(!$pass)exit(1);}

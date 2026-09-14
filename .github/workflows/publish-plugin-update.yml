@@ -1,0 +1,52 @@
+name: Publish plugin update
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-plugin-update
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build update package and manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          version=$(sed -n "s/^[[:space:]]*\* Version:[[:space:]]*\([^[:space:]]*\).*/\1/p" ggm-member-dashboard.php | head -n 1)
+          test -n "$version"
+          test "$version" = "$(sed -n "s/.*GGM_VERSION',[[:space:]]*'\([^']*\)'.*/\1/p" ggm-member-dashboard.php | head -n 1)"
+          mkdir -p dist/ggm-member-dashboard
+          git archive --format=tar HEAD | tar -x -C dist/ggm-member-dashboard
+          rm -rf dist/ggm-member-dashboard/.github dist/ggm-member-dashboard/.gitignore dist/ggm-member-dashboard/*.zip
+          (cd dist && zip -qr ggm-member-dashboard.zip ggm-member-dashboard)
+          jq --arg version "$version" '.version = $version | .download_url = "https://digtize.com/plugins/ggm/ggm-member-dashboard.zip"' update.json > dist/update.json
+
+      - name: Upload package and manifest over explicit FTPS
+        env:
+          FTP_USERNAME: ${{ secrets.GGM_FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.GGM_FTP_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$FTP_USERNAME"
+          test -n "$FTP_PASSWORD"
+          upload() {
+            local source="$1"
+            local destination="$2"
+            curl --fail --silent --show-error --retry 3 --ftp-ssl --ftp-ssl-reqd \
+              --user "$FTP_USERNAME:$FTP_PASSWORD" \
+              --upload-file "$source" \
+              "ftp://ftp.digtize.com:21//home/digtize/plugins/ggm/$destination"
+          }
+          upload dist/ggm-member-dashboard.zip ggm-member-dashboard.zip
+          upload dist/update.json update.json

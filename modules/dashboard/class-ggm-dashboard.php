@@ -27,6 +27,7 @@ class GGM_Dashboard {
 		$loader->add_action( 'wp_ajax_ggm_dashboard_ajax',     $this, 'ajax_get_dashboard_data' );
 		// Legacy alias so both action names work
 		$loader->add_action( 'wp_ajax_ggm_get_dashboard_data', $this, 'ajax_get_dashboard_data' );
+		$loader->add_action( 'wp_ajax_ggm_dashboard_course_lessons', $this, 'ajax_get_course_lessons' );
 		$loader->add_action( 'wp_ajax_ggm_update_profile',     $this, 'ajax_update_profile' );
 		$loader->add_action( 'wp_ajax_ggm_upload_avatar',      $this, 'ajax_upload_avatar' );
 		$loader->add_action( 'wp_ajax_ggm_remove_avatar',      $this, 'ajax_remove_avatar' );
@@ -76,8 +77,9 @@ class GGM_Dashboard {
 		);
 
 		// ─── 2. Courses — search `course` + `ggm_workshop` (old & new data) ──
+		// Card-only data: full lessons and oEmbed work are deferred until the course opens.
 		$courses_query = get_posts( array(
-			'post_type'      => array( 'course', 'ggm_workshop' ),
+			'post_type'      => 'course',
 			'post_status'    => 'publish',
 			'posts_per_page' => -1,
 			'orderby'        => 'title',
@@ -86,21 +88,10 @@ class GGM_Dashboard {
 
 		$enrolled_courses   = array();
 		$unenrolled_courses = array();
+		$lesson_counts      = $this->get_course_lesson_counts( wp_list_pluck( $courses_query, 'ID' ) );
 
 		foreach ( $courses_query as $c ) {
-			// Count lessons where meta 'course' = post ID.
-			$lesson_args = array(
-				'post_type'      => array( 'lesson', 'ggm_lesson' ),
-				'post_status'    => 'publish',
-				'posts_per_page' => -1,
-				'meta_query'     => array(
-					array( 'key' => 'course', 'value' => $c->ID ),
-				),
-			);
-			$course_lessons = class_exists( 'GGM_Lesson' )
-				? GGM_Lesson::get_for_course( $c->ID )
-				: get_posts( $lesson_args );
-			$video_count    = count( $course_lessons );
+			$video_count = (int) ( $lesson_counts[ $c->ID ] ?? 0 );
 
 			// Course access is direct only: an explicit free price, or a
 			// direct course purchase (no more membership gating).
@@ -132,36 +123,9 @@ class GGM_Dashboard {
 			);
 
 			if ( ggm_user_has_course_access( $c->ID, $user_id ) ) {
-				$completed_ids = array_map( 'absint', (array) get_user_meta( $user_id, 'ggm_completed_lessons', true ) );
-				$lessons       = $course_lessons;
-				$c_data['lessons'] = array();
-				foreach ( $lessons as $index => $lesson ) {
-					$video = get_post_meta( $lesson->ID, 'video_embed', true );
-					$video_html = '';
-					if ( $video ) {
-						$video_html = wp_oembed_get( $video );
-						if ( ! $video_html && false !== strpos( $video, '<' ) ) {
-							$video_html = $video;
-						}
-					}
-					$video_allowed = wp_kses_allowed_html( 'post' );
-					$video_allowed['iframe'] = array(
-						'src' => true, 'title' => true, 'width' => true, 'height' => true,
-						'allow' => true, 'allowfullscreen' => true, 'frameborder' => true,
-						'loading' => true, 'referrerpolicy' => true,
-					);
-					$c_data['lessons'][] = array(
-						'id'        => $lesson->ID,
-						'number'    => $index + 1,
-						'title'     => $lesson->post_title ?: sprintf( __( 'Lesson %d', 'ggm-member-dashboard' ), $index + 1 ),
-						'duration'  => get_post_meta( $lesson->ID, 'lesson_duration', true ),
-						'content'   => apply_filters( 'the_content', $lesson->post_content ),
-						'video'     => $video_html ? wp_kses( $video_html, $video_allowed ) : '',
-						'completed' => in_array( (int) $lesson->ID, $completed_ids, true ),
-					);
-				}
-				$c_data['completed_count'] = count( array_filter( $c_data['lessons'], function( $lesson ) { return $lesson['completed']; } ) );
-				$c_data['progress']        = $video_count ? (int) round( ( $c_data['completed_count'] / $video_count ) * 100 ) : 0;
+				$c_data['lessons_loaded'] = false;
+				$c_data['completed_count'] = 0;
+				$c_data['progress'] = 0;
 				$enrolled_courses[] = $c_data;
 			} else {
 				$unenrolled_courses[] = $c_data;
@@ -285,6 +249,38 @@ class GGM_Dashboard {
 			'free_workshops'     => $free_workshops,
 			'paid_workshops'     => $paid_workshops,
 		) );
+	}
+
+	/** Batch lesson totals for course cards; avoids a lesson query per course. */
+	private function get_course_lesson_counts( $course_ids ) {
+		global $wpdb;
+		$course_ids = array_values( array_filter( array_map( 'absint', (array) $course_ids ) ) );
+		if ( ! $course_ids ) return array();
+		$placeholders = implode( ',', array_fill( 0, count( $course_ids ), '%d' ) );
+		$sql = "SELECT pm.meta_value AS course_id, COUNT(DISTINCT p.ID) AS lesson_count FROM {$wpdb->posts} p INNER JOIN {$wpdb->postmeta} pm ON pm.post_id = p.ID AND pm.meta_key = 'course' WHERE p.post_type IN ('lesson','ggm_lesson') AND p.post_status = 'publish' AND pm.meta_value IN ({$placeholders}) GROUP BY pm.meta_value";
+		$rows = $wpdb->get_results( $wpdb->prepare( $sql, $course_ids ) );
+		$counts = array();
+		foreach ( (array) $rows as $row ) $counts[ absint( $row->course_id ) ] = (int) $row->lesson_count;
+		return $counts;
+	}
+
+	/** Load one authorized course's detailed lesson data only when it is opened. */
+	public function ajax_get_course_lessons() {
+		check_ajax_referer( 'ggm_nonce', 'nonce' );
+		$user_id = get_current_user_id(); $course_id = absint( $_POST['course_id'] ?? 0 ); $course = get_post( $course_id );
+		if ( ! $user_id || ! $course || 'course' !== $course->post_type || 'publish' !== $course->post_status || ! ggm_user_has_course_access( $course_id, $user_id ) ) {
+			wp_send_json_error( array( 'message' => __( 'You cannot access this course.', 'ggm-member-dashboard' ) ), 403 );
+		}
+		$completed_ids = array_map( 'absint', (array) get_user_meta( $user_id, 'ggm_completed_lessons', true ) );
+		$lessons = class_exists( 'GGM_Lesson' ) ? GGM_Lesson::get_for_course( $course_id ) : array();
+		$payload = array(); $video_allowed = wp_kses_allowed_html( 'post' );
+		$video_allowed['iframe'] = array( 'src' => true, 'title' => true, 'width' => true, 'height' => true, 'allow' => true, 'allowfullscreen' => true, 'frameborder' => true, 'loading' => true, 'referrerpolicy' => true );
+		foreach ( $lessons as $index => $lesson ) {
+			$video = get_post_meta( $lesson->ID, 'video_embed', true ); $video_html = '';
+			if ( $video ) { $video_html = wp_oembed_get( $video ); if ( ! $video_html && false !== strpos( $video, '<' ) ) $video_html = $video; }
+			$payload[] = array( 'id' => $lesson->ID, 'number' => $index + 1, 'title' => $lesson->post_title ?: sprintf( __( 'Lesson %d', 'ggm-member-dashboard' ), $index + 1 ), 'duration' => get_post_meta( $lesson->ID, 'lesson_duration', true ), 'content' => apply_filters( 'the_content', $lesson->post_content ), 'video' => $video_html ? wp_kses( $video_html, $video_allowed ) : '', 'completed' => in_array( (int) $lesson->ID, $completed_ids, true ) );
+		}
+		wp_send_json_success( array( 'course_id' => $course_id, 'lessons' => $payload ) );
 	}
 
 	/**

@@ -800,6 +800,32 @@ class GGM_Meta_Boxes {
 		</div>
 		<?php
 		$this->print_repeaters_js();
+		$this->print_workshop_admin_configuration_js();
+	}
+
+	/** Apply the global admin-only Workshop editor order/visibility configuration. */
+	private function print_workshop_admin_configuration_js() {
+		if ( ! class_exists( 'GGM_Workshop_Admin_Config' ) ) { return; }
+		$config = GGM_Workshop_Admin_Config::get();
+		?>
+		<script>
+		(function($){
+			var config=<?php echo wp_json_encode( $config ); ?>;
+			function row(selector){return $(selector).first().closest('tr');}
+			var fields={
+				mentors:row('[name="ggm_mentor_ids[]"]'), linked_course:row('[name="linked_course_id"]'), countdown:row('[name="Counter_Start_Date"]'), preparatory_date:row('[name="workshop_preparatory_date"]'), date_range:row('[name="workshop_start_date"]'), pricing:row('[name="workshop_regular_price"]'), mode:row('[name="workshop_mode"]'), header_pill:row('[name="ggm_workshop_header_pill_text"]'), whatsapp:row('[name="ggm_workshop_whatsapp_group_url"]'), language:row('[name="workshop_language"]'), duration:row('[name="duration"]'), is_free:row('[name="is_free"]'), featured_video:row('[name="ggm_workshop_featured_video_url"]'), bottom_image:row('[name="ggm_workshop_bottom_image_id"]'), hero:row('[name="ggm_workshop_booking_card_hero_header"]'), cta:row('[name="ggm_workshop_booking_card_cta_heading"]'), social_proof:row('[name="ggm_workshop_booking_card_testimonial_text"]'), heading:row('[name="ggm_workshop_form_text_heading"]'), content:row('[name="ggm_workshop_form_text_content"]')
+			};
+			var sections={
+				time_slots:$('#ggm-table-workshop_time_slots').closest('.ggm-repeater-block,div'), additional_layout:$('[name^="ggm_workshop_additional_block_layouts"]').closest('div'), discover:$('#ggm-table-ggm_you_will_discover').closest('.ggm-repeater-block'), why_different:$('#ggm-table-ggm_why_different_points').closest('.ggm-repeater-block'), why_workshop_different:$('#ggm-table-ggm_workshop_why_workshop_different_points').closest('.ggm-repeater-block'), journey:$('#ggm-table-ggm_workshop_journey_days').closest('.ggm-repeater-block'), perfect_for:$('#ggm-table-ggm_perfect_for_you').closest('.ggm-repeater-block'), faq:$('#ggm-table-ggm_faq').closest('.ggm-repeater-block')
+			};
+			var $root=$('#ggm_workshop_details');
+			if(!$root.length)return;
+			$.each(config.fields||{},function(section,items){$.each(items,function(_,item){var $node=fields[item.id];if(!$node||!$node.length)return;$node.toggle(!!item.enabled);if(item.enabled){$node.appendTo($node.parent());}});});
+			$.each(config.sections||[],function(_,section){var $node=sections[section.id];if(!$node||!$node.length)return;$node.toggle(!!section.enabled);if(section.enabled){$node.appendTo($root.find('.ggm-meta-container').last());}});
+			var $table=$root.find('table.ggm-meta-table').first();$.each((config.fields||{}).workshop_details||[],function(_,item){var $node=fields[item.id];if($node&&$node.length&&item.enabled)$table.append($node);});
+		})(jQuery);
+		</script>
+		<?php
 	}
 
 	/**

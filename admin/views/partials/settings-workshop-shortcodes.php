@@ -24,7 +24,75 @@ $workshop_heading_settings = array(
 	'ggm_workshop_perfect_for_heading'   => __( 'Perfect For You If You Want To', 'ggm-member-dashboard' ),
 	'ggm_workshop_faq_heading'           => __( 'Frequently Asked Questions', 'ggm-member-dashboard' ),
 );
+$workshop_display_config = class_exists( 'GGM_Workshop_Admin_Config' ) ? GGM_Workshop_Admin_Config::get() : array( 'sections' => array(), 'fields' => array() );
+$workshop_display_sections = class_exists( 'GGM_Workshop_Admin_Config' ) ? GGM_Workshop_Admin_Config::sections() : array();
+$workshop_display_fields = class_exists( 'GGM_Workshop_Admin_Config' ) ? GGM_Workshop_Admin_Config::fields() : array();
+$workshop_display_defaults = array(
+	'sections' => array_keys( $workshop_display_sections ),
+	'information_fields' => array_keys( $workshop_display_fields ),
+);
 ?>
+<?php if ( false ) : // Superseded frontend-composite controls; retained only as patch context until removal. ?>
+
+<div id="ggm-workshop-configuration" class="ggm-workshop-display-config" style="background:#f8f9fa; border:1px solid #e0e0e0; border-radius:8px; padding:20px; margin-bottom:20px;">
+	<h3 style="margin-top:0;"><?php esc_html_e( 'Workshop Configuration', 'ggm-member-dashboard' ); ?></h3>
+	<p class="description"><?php esc_html_e( 'Superseded settings markup retained only as inactive patch context.', 'ggm-member-dashboard' ); ?></p>
+	<p class="description"><?php esc_html_e( 'Drag a row, or use its Move up/Move down controls. Turn a row off to omit it from the composite Workshop page when its normal content and access conditions allow it to render.', 'ggm-member-dashboard' ); ?></p>
+	<?php
+	$render_display_rows = static function( $rows, $labels, $key ) {
+		foreach ( $rows as $index => $row ) {
+			$id = $row['id'] ?? '';
+			if ( ! isset( $labels[ $id ] ) ) { continue; }
+			?>
+			<li class="ggm-workshop-display-config__row" data-config-row>
+				<input type="hidden" name="settings[obsolete_workshop_configuration][<?php echo esc_attr( $key ); ?>][<?php echo esc_attr( $index ); ?>][id]" value="<?php echo esc_attr( $id ); ?>">
+				<span class="dashicons dashicons-menu ggm-workshop-display-config__handle" aria-hidden="true"></span>
+				<strong><?php echo esc_html( $labels[ $id ] ); ?></strong>
+				<label><input type="checkbox" name="settings[obsolete_workshop_configuration][<?php echo esc_attr( $key ); ?>][<?php echo esc_attr( $index ); ?>][enabled]" value="1" <?php checked( ! empty( $row['enabled'] ) ); ?>> <?php esc_html_e( 'Show', 'ggm-member-dashboard' ); ?></label>
+				<span class="ggm-workshop-display-config__moves"><button type="button" class="button-link" data-move="up"><?php esc_html_e( 'Move up', 'ggm-member-dashboard' ); ?></button><button type="button" class="button-link" data-move="down"><?php esc_html_e( 'Move down', 'ggm-member-dashboard' ); ?></button></span>
+			</li>
+			<?php
+		}
+	};
+	?>
+	<h4><?php esc_html_e( 'Frontend Sections', 'ggm-member-dashboard' ); ?></h4>
+	<ul class="ggm-workshop-display-config__list" data-config-list="sections"><?php $render_display_rows( $workshop_display_config['sections'], $workshop_display_sections, 'sections' ); ?></ul>
+	<h4><?php esc_html_e( 'Workshop Information Fields', 'ggm-member-dashboard' ); ?></h4>
+	<p class="description"><?php esc_html_e( 'These controls affect information display only. Dates, price, contribution options, and time slots remain active functional configuration even when their display row is hidden.', 'ggm-member-dashboard' ); ?></p>
+	<ul class="ggm-workshop-display-config__list" data-config-list="information_fields"><?php $render_display_rows( $workshop_display_config['information_fields'], $workshop_display_fields, 'information_fields' ); ?></ul>
+	<p><button type="button" class="button" data-config-reset><?php esc_html_e( 'Reset Workshop Configuration Defaults', 'ggm-member-dashboard' ); ?></button></p>
+</div>
+<style>
+.ggm-workshop-display-config__list{margin:10px 0 18px;max-width:760px}.ggm-workshop-display-config__row{align-items:center;background:#fff;border:1px solid #dcdcde;border-radius:4px;display:flex;gap:12px;margin:6px 0;padding:10px}.ggm-workshop-display-config__handle{color:#646970;cursor:move}.ggm-workshop-display-config__row strong{flex:1}.ggm-workshop-display-config__moves{display:flex;gap:8px}.ggm-workshop-display-config__moves .button-link{cursor:pointer}
+</style>
+<script>
+(function($){
+	var defaults=<?php echo wp_json_encode( $workshop_display_defaults ); ?>;
+	function renumber($list){$list.children('[data-config-row]').each(function(i){$(this).find('input').each(function(){this.name=this.name.replace(/\[(sections|information_fields)\]\[\d+\]/,function(match,key){return '['+key+']['+i+']';});});});}
+	function init(){var $lists=$('.ggm-workshop-display-config__list');if($.fn.sortable){$lists.sortable({axis:'y',handle:'.ggm-workshop-display-config__handle',update:function(){renumber($(this));}});}$lists.on('click','[data-move]',function(){var $row=$(this).closest('[data-config-row]'),$list=$row.parent();if($(this).data('move')==='up'){$row.prev().before($row);}else{$row.next().after($row);}renumber($list);});$('[data-config-reset]').on('click',function(){if(!window.confirm('<?php echo esc_js( __( 'Reset both Workshop Configuration lists to their defaults? Save settings to apply the reset.', 'ggm-member-dashboard' ) ); ?>')){return;}var $box=$(this).closest('.ggm-workshop-display-config');$box.find('input[type=checkbox]').prop('checked',true);$box.find('[data-config-list]').each(function(){var $list=$(this),order=defaults[$list.data('config-list')]||[];$list.children().sort(function(a,b){return order.indexOf($(a).find('input[type=hidden]').val())-order.indexOf($(b).find('input[type=hidden]').val());}).appendTo($list);renumber($list);});});}
+	$(init);
+})(jQuery);
+</script>
+<?php endif; ?>
+
+<div id="ggm-workshop-configuration" class="ggm-workshop-admin-config" style="background:#f8f9fa;border:1px solid #e0e0e0;border-radius:8px;padding:20px;margin-bottom:20px;">
+	<h3 style="margin-top:0;"><?php esc_html_e( 'Workshop Admin Create/Edit Configuration', 'ggm-member-dashboard' ); ?></h3>
+	<p class="description"><?php esc_html_e( 'These settings control what administrators see and the order in which it appears on Workshop Add/Edit screens. They never delete Workshop data or change the frontend, Elementor, checkout, payments, access, or time slots.', 'ggm-member-dashboard' ); ?></p>
+	<?php foreach ( $workshop_display_config['sections'] as $section_index => $section ) : $section_id = $section['id']; if ( ! isset( $workshop_display_sections[ $section_id ] ) ) { continue; } ?>
+		<div class="ggm-workshop-admin-config__section">
+			<input type="hidden" name="settings[ggm_workshop_admin_configuration][sections][<?php echo esc_attr( $section_index ); ?>][id]" value="<?php echo esc_attr( $section_id ); ?>">
+			<h4><span class="dashicons dashicons-menu" aria-hidden="true"></span> <?php echo esc_html( $workshop_display_sections[ $section_id ] ); ?> <label><input type="checkbox" name="settings[ggm_workshop_admin_configuration][sections][<?php echo esc_attr( $section_index ); ?>][enabled]" value="1" <?php checked( ! empty( $section['enabled'] ) ); ?>> <?php esc_html_e( 'Show section', 'ggm-member-dashboard' ); ?></label></h4>
+			<p><button type="button" class="button-link" data-admin-config-move="up"><?php esc_html_e( 'Move section up', 'ggm-member-dashboard' ); ?></button> <button type="button" class="button-link" data-admin-config-move="down"><?php esc_html_e( 'Move section down', 'ggm-member-dashboard' ); ?></button></p>
+			<ul class="ggm-workshop-admin-config__fields">
+			<?php foreach ( $workshop_display_config['fields'][ $section_id ] as $field_index => $field ) : $field_id = $field['id']; if ( ! isset( $workshop_display_fields[ $section_id ][ $field_id ] ) ) { continue; } ?>
+				<li><input type="hidden" name="settings[ggm_workshop_admin_configuration][fields][<?php echo esc_attr( $section_id ); ?>][<?php echo esc_attr( $field_index ); ?>][id]" value="<?php echo esc_attr( $field_id ); ?>"><span class="dashicons dashicons-menu" aria-hidden="true"></span> <?php echo esc_html( $workshop_display_fields[ $section_id ][ $field_id ] ); ?> <label><input type="checkbox" name="settings[ggm_workshop_admin_configuration][fields][<?php echo esc_attr( $section_id ); ?>][<?php echo esc_attr( $field_index ); ?>][enabled]" value="1" <?php checked( ! empty( $field['enabled'] ) ); ?>> <?php esc_html_e( 'Show', 'ggm-member-dashboard' ); ?></label> <button type="button" class="button-link" data-admin-config-move="up"><?php esc_html_e( 'Up', 'ggm-member-dashboard' ); ?></button> <button type="button" class="button-link" data-admin-config-move="down"><?php esc_html_e( 'Down', 'ggm-member-dashboard' ); ?></button></li>
+			<?php endforeach; ?>
+			</ul>
+		</div>
+	<?php endforeach; ?>
+</div>
+<style>.ggm-workshop-admin-config__section{background:#fff;border:1px solid #dcdcde;border-radius:5px;margin:12px 0;padding:12px}.ggm-workshop-admin-config__section h4{margin:0}.ggm-workshop-admin-config__fields li{align-items:center;display:flex;gap:8px;margin:6px 0}.ggm-workshop-admin-config__fields .dashicons,.ggm-workshop-admin-config__section h4 .dashicons{color:#646970}</style>
+<script>(function($){function renumber($list){$list.children().each(function(i){$(this).find('input').each(function(){this.name=this.name.replace(/\[(sections|fields)(?:\]\[[^\]]+\])?\]\[\d+\]/,function(match,key){return match.replace(/\[\d+\]$/, '['+i+']');});});});}$(function(){$('.ggm-workshop-admin-config__section,.ggm-workshop-admin-config__fields li').on('click','[data-admin-config-move]',function(){var $row=$(this).closest('li,.ggm-workshop-admin-config__section'),$siblings=$row.siblings($row.is('li')?'li':'.ggm-workshop-admin-config__section');if($(this).data('admin-config-move')==='up'){$row.prev($row.is('li')?'li':'.ggm-workshop-admin-config__section').before($row);}else{$row.next($row.is('li')?'li':'.ggm-workshop-admin-config__section').after($row);}renumber($row.parent());});if($.fn.sortable){$('.ggm-workshop-admin-config').sortable({items:'.ggm-workshop-admin-config__section',handle:'h4 .dashicons',update:function(){renumber($(this));}});$('.ggm-workshop-admin-config__fields').sortable({items:'li',handle:'.dashicons',update:function(){renumber($(this));}});}});})(jQuery);</script>
 
 <div style="background:#f8f9fa; border:1px solid #e0e0e0; border-radius:8px; padding:20px; margin-bottom:20px;">
 	<h3 style="margin-top:0;"><?php esc_html_e( 'Workshop Time Slot Types', 'ggm-member-dashboard' ); ?></h3>

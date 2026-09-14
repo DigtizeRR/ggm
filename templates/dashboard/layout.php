@@ -40,6 +40,7 @@ $avatar_img  = $custom_avatar ?: $gravatar_url;
 $custom_links_value = ggm_get_setting( 'ggm_dashboard_custom_links', '[]' );
 $custom_links       = is_array( $custom_links_value ) ? $custom_links_value : json_decode( $custom_links_value, true );
 $custom_links       = is_array( $custom_links ) ? $custom_links : array();
+$is_dashboard_administrator = function_exists( 'ggm_dashboard_user_is_administrator' ) && ggm_dashboard_user_is_administrator();
 ?>
 <div id="ggm-dash" class="ggm-dash-wrap">
 	<!-- Loader Spinner -->
@@ -72,6 +73,14 @@ $custom_links       = is_array( $custom_links ) ? $custom_links : array();
 				<span class="dashicons dashicons-awards"></span>
 				<span class="nav-text"><?php esc_html_e( 'Workshops', 'ggm-member-dashboard' ); ?></span>
 			</button>
+			<?php if ( $is_dashboard_administrator ) : ?>
+			<div class="ggm-dash-nav-divider"><?php esc_html_e( 'Administration', 'ggm-member-dashboard' ); ?></div>
+			<button class="ggm-dash-nav-item" data-tab="admin-workshops"><span class="dashicons dashicons-calendar-alt"></span><span class="nav-text"><?php esc_html_e( 'Manage Workshops', 'ggm-member-dashboard' ); ?></span></button>
+			<button class="ggm-dash-nav-item" data-tab="admin-courses"><span class="dashicons dashicons-welcome-learn-more"></span><span class="nav-text"><?php esc_html_e( 'Manage Courses', 'ggm-member-dashboard' ); ?></span></button>
+			<button class="ggm-dash-nav-item" data-tab="admin-members"><span class="dashicons dashicons-groups"></span><span class="nav-text"><?php esc_html_e( 'Members', 'ggm-member-dashboard' ); ?></span></button>
+			<button class="ggm-dash-nav-item" data-tab="admin-payments"><span class="dashicons dashicons-money-alt"></span><span class="nav-text"><?php esc_html_e( 'Payments', 'ggm-member-dashboard' ); ?></span></button>
+			<button class="ggm-dash-nav-item" data-tab="admin-diseases"><span class="dashicons dashicons-heart"></span><span class="nav-text"><?php esc_html_e( 'Diseases', 'ggm-member-dashboard' ); ?></span></button>
+			<?php endif; ?>
 			<button class="ggm-dash-nav-item" data-tab="health">
 				<span class="dashicons dashicons-clipboard"></span>
 				<span class="nav-text"><?php esc_html_e( 'Health Information', 'ggm-member-dashboard' ); ?></span>
@@ -163,6 +172,16 @@ $custom_links       = is_array( $custom_links ) ? $custom_links : array();
 			<section id="tab-free" class="ggm-tab">
 				<?php include GGM_PLUGIN_DIR . 'templates/dashboard/tab-workshops.php'; ?>
 			</section>
+			<?php if ( $is_dashboard_administrator ) : ?>
+			<section id="tab-admin-workshops" class="ggm-tab"><?php include GGM_PLUGIN_DIR . 'templates/dashboard/admin/workshops.php'; ?></section>
+			<section id="tab-admin-workshop-editor" class="ggm-tab"><?php include GGM_PLUGIN_DIR . 'templates/dashboard/admin/workshop-editor.php'; ?></section>
+			<section id="tab-admin-courses" class="ggm-tab"><?php include GGM_PLUGIN_DIR . 'templates/dashboard/admin/courses.php'; ?></section>
+			<section id="tab-admin-course-editor" class="ggm-tab"><?php include GGM_PLUGIN_DIR . 'templates/dashboard/admin/course-editor.php'; ?></section>
+			<section id="tab-admin-members" class="ggm-tab"><?php include GGM_PLUGIN_DIR . 'templates/dashboard/admin/members.php'; ?></section>
+			<section id="tab-admin-payments" class="ggm-tab"><?php include GGM_PLUGIN_DIR . 'templates/dashboard/admin/payments.php'; ?></section>
+			<section id="tab-admin-diseases" class="ggm-tab"><?php include GGM_PLUGIN_DIR . 'templates/dashboard/admin/diseases.php'; ?></section>
+			<section id="tab-admin-disease-editor" class="ggm-tab"><?php include GGM_PLUGIN_DIR . 'templates/dashboard/admin/disease-editor.php'; ?></section>
+			<?php endif; ?>
 
 			<section id="tab-health" class="ggm-tab">
 				<?php include GGM_PLUGIN_DIR . 'templates/dashboard/tab-health.php'; ?>
@@ -206,6 +225,10 @@ $custom_links       = is_array( $custom_links ) ? $custom_links : array();
 				<span class="dashicons dashicons-heart"></span>
 				<span class="bn-text"><?php esc_html_e( 'Disease', 'ggm-member-dashboard' ); ?></span>
 			</button>
+			<?php if ( $is_dashboard_administrator ) : ?>
+			<button class="ggm-bn-item" data-tab="admin-workshops"><span class="dashicons dashicons-calendar-alt"></span><span class="bn-text"><?php esc_html_e( 'Manage', 'ggm-member-dashboard' ); ?></span></button>
+			<button class="ggm-bn-item" data-tab="admin-members"><span class="dashicons dashicons-groups"></span><span class="bn-text"><?php esc_html_e( 'Members', 'ggm-member-dashboard' ); ?></span></button>
+			<?php endif; ?>
 			<?php if ( class_exists( 'WooCommerce' ) ) : ?>
 			<button class="ggm-bn-item" data-tab="woocommerce">
 				<span class="dashicons dashicons-store"></span>

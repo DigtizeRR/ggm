@@ -1,0 +1,13 @@
+{
+  "name": "Digtize LMS System",
+  "version": "1.3.8",
+  "homepage": "https://digtize.com/",
+  "download_url": "https://digtize.com/plugins/ggm/ggm-member-dashboard.zip",
+  "requires": "6.2",
+  "requires_php": "7.4",
+  "tested": "6.8",
+  "sections": {
+    "description": "Private member dashboard, membership, workshop, lesson, payment, and OTP system.",
+    "changelog": "<h4>1.3.7</h4><ul><li>Fixed the Dashboard Home timeout path by keeping lesson bodies, videos, content filtering, and oEmbed work out of the initial Dashboard AJAX response.</li><li>Course cards now use one batched lesson-count query; detailed lessons load only when an authorized user opens that course.</li><li>Stopped legacy Workshop records from being treated as Dashboard Course records.</li></ul><h4>1.3.6</h4><ul><li>Added a protected, server-rendered Administrator overview to Dashboard Home with Customer, Workshop, Course, and successful-payment counts.</li><li>Added desktop sidebar navigation scrolling while keeping the logo and Logout control fixed.</li><li>Overview Customer count reuses the same authoritative WordPress Customer source as the native and Dashboard Members screens.</li></ul><h4>1.3.5</h4><ul><li>Dashboard and native Members now use WordPress Customer users as the primary member population.</li><li>Added batched canonical Workshop-assignment display and Customer/Workshop diagnostics.</li></ul><h4>1.3.4</h4><ul><li>Normalized Dashboard Members fields to the shared authoritative member response.</li><li>Added protected member-query diagnostics and controlled debug logging for database failures.</li></ul><h4>1.3.3</h4><ul><li>Unified native WordPress Admin and Dashboard Members behind one authoritative member data service.</li></ul>"
+  }
+}

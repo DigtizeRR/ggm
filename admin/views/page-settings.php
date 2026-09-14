@@ -27,7 +27,7 @@ $settings = get_option( 'ggm_settings', array() );
 		<a href="#ggm-tab-smtp" class="nav-tab" data-tab="smtp"><?php esc_html_e( 'SMTP Settings', 'ggm-member-dashboard' ); ?></a>
 		<a href="#ggm-tab-emails" class="nav-tab" data-tab="emails"><?php esc_html_e( 'Email Templates', 'ggm-member-dashboard' ); ?></a>
 		<a href="#ggm-tab-custom" class="nav-tab" data-tab="custom"><?php esc_html_e( 'Customizations & Shortcodes', 'ggm-member-dashboard' ); ?></a>
-		<a href="#ggm-tab-workshop-sc" class="nav-tab" data-tab="workshop-sc"><?php esc_html_e( 'Workshop Shortcodes', 'ggm-member-dashboard' ); ?></a>
+		<a href="#ggm-tab-workshop-sc" class="nav-tab" data-tab="workshop-sc"><?php esc_html_e( 'Workshop Configuration', 'ggm-member-dashboard' ); ?></a>
 		<a href="#ggm-tab-error-log" class="nav-tab" data-tab="error-log"><?php esc_html_e( 'Error Log', 'ggm-member-dashboard' ); ?></a>
 	</nav>
 

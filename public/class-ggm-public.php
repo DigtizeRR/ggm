@@ -426,6 +426,21 @@ class GGM_Public {
 		wp_enqueue_style( 'dashicons' );
 		wp_enqueue_style( 'ggm-dashboard-css', GGM_PLUGIN_URL . 'assets/css/ggm-dashboard.css', array( 'dashicons' ), $dashboard_css_ver );
 		wp_enqueue_script( 'ggm-dashboard-js', GGM_PLUGIN_URL . 'assets/js/ggm-dashboard.js', array( 'jquery' ), $dashboard_js_ver, true );
+		if ( function_exists( 'ggm_dashboard_user_is_administrator' ) && ggm_dashboard_user_is_administrator() ) {
+			wp_enqueue_media();
+			wp_enqueue_editor();
+			$management_js_path = GGM_PLUGIN_DIR . 'assets/js/ggm-dashboard-management.js';
+			wp_enqueue_script( 'ggm-dashboard-management-js', GGM_PLUGIN_URL . 'assets/js/ggm-dashboard-management.js', array( 'jquery', 'ggm-dashboard-js' ), file_exists( $management_js_path ) ? filemtime( $management_js_path ) : GGM_VERSION, true );
+			wp_localize_script( 'ggm-dashboard-management-js', 'ggmDashboardManagement', array( 'ajaxUrl' => admin_url( 'admin-ajax.php' ), 'nonce' => wp_create_nonce( 'ggm_dashboard_management' ) ) );
+			$payments_js = GGM_PLUGIN_DIR . 'assets/js/ggm-dashboard-payments.js';
+			wp_enqueue_script( 'ggm-dashboard-payments-js', GGM_PLUGIN_URL . 'assets/js/ggm-dashboard-payments.js', array( 'jquery', 'ggm-dashboard-management-js' ), file_exists( $payments_js ) ? filemtime( $payments_js ) : GGM_VERSION, true );
+			$workshop_editor_js = GGM_PLUGIN_DIR . 'assets/js/ggm-dashboard-workshop-editor.js';
+			wp_enqueue_script( 'ggm-dashboard-workshop-editor-js', GGM_PLUGIN_URL . 'assets/js/ggm-dashboard-workshop-editor.js', array( 'jquery', 'ggm-dashboard-management-js', 'media-editor' ), file_exists( $workshop_editor_js ) ? filemtime( $workshop_editor_js ) : GGM_VERSION, true );
+			$course_editor_js = GGM_PLUGIN_DIR . 'assets/js/ggm-dashboard-course-editor.js';
+			wp_enqueue_script( 'ggm-dashboard-course-editor-js', GGM_PLUGIN_URL . 'assets/js/ggm-dashboard-course-editor.js', array( 'jquery', 'ggm-dashboard-management-js', 'media-editor' ), file_exists( $course_editor_js ) ? filemtime( $course_editor_js ) : GGM_VERSION, true );
+			$diseases_js = GGM_PLUGIN_DIR . 'assets/js/ggm-dashboard-diseases.js';
+			wp_enqueue_script( 'ggm-dashboard-diseases-js', GGM_PLUGIN_URL . 'assets/js/ggm-dashboard-diseases.js', array( 'jquery', 'ggm-dashboard-management-js', 'editor' ), file_exists( $diseases_js ) ? filemtime( $diseases_js ) : GGM_VERSION, true );
+		}
 
 		if ( ! self::$dashboard_assets_localized ) {
 			wp_localize_script( 'ggm-dashboard-js', 'ggm_public', $this->shared_js_data() );

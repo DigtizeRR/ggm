@@ -102,6 +102,91 @@ class GGM_Diseases {
 		return is_array( $rows ) ? $rows : array();
 	}
 
+	/** Return a paginated set of active diseases for administrator management. */
+	public static function query_active( $page = 1, $search = '', $per_page = 10 ) {
+		global $wpdb;
+		$table    = self::table();
+		$page     = max( 1, absint( $page ) );
+		$per_page = max( 1, min( 100, absint( $per_page ) ) );
+		$search   = sanitize_text_field( $search );
+		$where    = "WHERE status='active'";
+		$params   = array();
+		if ( '' !== $search ) {
+			$like     = '%' . $wpdb->esc_like( $search ) . '%';
+			$where   .= ' AND (title LIKE %s OR description LIKE %s)';
+			$params[] = $like;
+			$params[] = $like;
+		}
+
+		$total_sql = "SELECT COUNT(*) FROM $table $where"; // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$total     = $params ? (int) $wpdb->get_var( $wpdb->prepare( $total_sql, $params ) ) : (int) $wpdb->get_var( $total_sql ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		$pages     = max( 1, (int) ceil( $total / $per_page ) );
+		$page      = min( $page, $pages );
+		$offset    = ( $page - 1 ) * $per_page;
+		$list_sql  = "SELECT * FROM $table $where ORDER BY updated_at DESC LIMIT %d OFFSET %d"; // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$rows      = $wpdb->get_results( $wpdb->prepare( $list_sql, array_merge( $params, array( $per_page, $offset ) ) ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+
+		return array(
+			'items'    => is_array( $rows ) ? $rows : array(),
+			'page'     => $page,
+			'pages'    => $pages,
+			'total'    => $total,
+			'per_page' => $per_page,
+		);
+	}
+
+	/** Load one active Disease record. */
+	public static function get_active( $id ) {
+		$id = absint( $id );
+		if ( ! $id ) {
+			return null;
+		}
+
+		global $wpdb;
+		return $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM ' . self::table() . " WHERE id=%d AND status='active'", $id ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+	}
+
+	/** Create or update a Disease while preserving native validation and fields. */
+	public static function save( $id, $title, $description ) {
+		global $wpdb;
+		$id          = absint( $id );
+		$title       = sanitize_text_field( wp_unslash( $title ) );
+		$description = wp_kses_post( wp_unslash( $description ) );
+		$title_len   = function_exists( 'mb_strlen' ) ? mb_strlen( $title ) : strlen( $title );
+		if ( '' === $title || '' === trim( wp_strip_all_tags( $description ) ) ) {
+			return new WP_Error( 'ggm_disease_required', __( 'Title and description are required.', 'ggm-member-dashboard' ) );
+		}
+		if ( $title_len > 255 ) {
+			return new WP_Error( 'ggm_disease_title_too_long', __( 'Title must not exceed 255 characters.', 'ggm-member-dashboard' ) );
+		}
+
+		$data = array(
+			'title'       => $title,
+			'description' => $description,
+			'status'      => 'active',
+			'updated_at'  => current_time( 'mysql' ),
+		);
+		if ( $id ) {
+			if ( ! self::get_active( $id ) ) {
+				return new WP_Error( 'ggm_disease_not_found', __( 'The Disease could not be found.', 'ggm-member-dashboard' ) );
+			}
+			$updated = $wpdb->update( self::table(), $data, array( 'id' => $id ), array( '%s', '%s', '%s', '%s' ), array( '%d' ) );
+			if ( false === $updated ) {
+				return new WP_Error( 'ggm_disease_save_failed', __( 'Could not save disease.', 'ggm-member-dashboard' ) );
+			}
+			return array( 'id' => $id, 'notice' => 'saved' );
+		}
+
+		$data['created_by'] = get_current_user_id();
+		$data['created_at'] = current_time( 'mysql' );
+		$inserted = $wpdb->insert( self::table(), $data, array( '%s', '%s', '%s', '%s', '%d', '%s' ) );
+		if ( false === $inserted ) {
+			return new WP_Error( 'ggm_disease_save_failed', __( 'Could not create disease.', 'ggm-member-dashboard' ) );
+		}
+
+		return array( 'id' => (int) $wpdb->insert_id, 'notice' => 'created' );
+	}
+
 	public static function assign_to_users( array $user_ids, array $disease_ids, $mode = 'add' ) {
 		$user_ids    = array_values( array_unique( array_filter( array_map( 'absint', $user_ids ) ) ) );
 		$disease_ids = array_values( array_unique( array_filter( array_map( 'absint', $disease_ids ) ) ) );
@@ -350,24 +435,12 @@ class GGM_Diseases {
 
 	private static function render_list_tab( $search = '', $paged = 1 ) {
 		global $wpdb;
-		$table    = self::table();
 		$per_page = 10;
-		$paged    = max( 1, absint( $paged ) );
+		$result   = self::query_active( $paged, $search, $per_page );
+		$paged    = $result['page'];
 		$search   = sanitize_text_field( $search );
-		$where    = "WHERE status='active'";
-		$params   = array();
-		if ( '' !== $search ) {
-			$like     = '%' . $wpdb->esc_like( $search ) . '%';
-			$where   .= ' AND (title LIKE %s OR description LIKE %s)';
-			$params[] = $like;
-			$params[] = $like;
-		}
-
-		$total_sql = "SELECT COUNT(*) FROM $table $where"; // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-		$total     = $params ? (int) $wpdb->get_var( $wpdb->prepare( $total_sql, $params ) ) : (int) $wpdb->get_var( $total_sql ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-		$offset    = ( $paged - 1 ) * $per_page;
-		$list_sql  = "SELECT * FROM $table $where ORDER BY updated_at DESC LIMIT %d OFFSET %d"; // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-		$diseases  = $wpdb->get_results( $wpdb->prepare( $list_sql, array_merge( $params, array( $per_page, $offset ) ) ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		$total    = $result['total'];
+		$diseases = $result['items'];
 		$base_url  = self::base_url();
 		$list_url  = add_query_arg( 'tab', 'list', $base_url );
 		$create_url = add_query_arg( 'tab', 'create', $base_url );
@@ -429,7 +502,7 @@ class GGM_Diseases {
 				</table>
 			</form>
 			<?php
-			$total_pages = max( 1, (int) ceil( $total / $per_page ) );
+			$total_pages = $result['pages'];
 			if ( $total_pages > 1 ) {
 				echo '<div class="tablenav bottom"><div class="tablenav-pages">';
 				echo wp_kses_post(
@@ -452,50 +525,11 @@ class GGM_Diseases {
 	}
 
 	private static function get_disease( $id ) {
-		$id = absint( $id );
-		if ( ! $id ) {
-			return null;
-		}
-
-		global $wpdb;
-		return $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM ' . self::table() . " WHERE id=%d AND status='active'", $id ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		return self::get_active( $id );
 	}
 
 	private static function save_disease_from_request() {
-		global $wpdb;
-		$id   = absint( $_POST['disease_id'] ?? 0 );
-		$data = array(
-			'title'       => sanitize_text_field( wp_unslash( $_POST['title'] ?? '' ) ),
-			'description' => wp_kses_post( wp_unslash( $_POST['description'] ?? '' ) ),
-			'status'      => 'active',
-			'updated_at'  => current_time( 'mysql' ),
-		);
-		if ( '' === $data['title'] || '' === trim( wp_strip_all_tags( $data['description'] ) ) ) {
-			return new WP_Error( 'ggm_disease_required', __( 'Title and description are required.', 'ggm-member-dashboard' ) );
-		}
-
-		if ( $id ) {
-			$updated = $wpdb->update( self::table(), $data, array( 'id' => $id ), array( '%s', '%s', '%s', '%s' ), array( '%d' ) );
-			if ( false === $updated ) {
-				return new WP_Error( 'ggm_disease_save_failed', __( 'Could not save disease.', 'ggm-member-dashboard' ) );
-			}
-			return array(
-				'id'     => $id,
-				'notice' => 'saved',
-			);
-		}
-
-		$data['created_by'] = get_current_user_id();
-		$data['created_at'] = current_time( 'mysql' );
-		$inserted = $wpdb->insert( self::table(), $data, array( '%s', '%s', '%s', '%s', '%d', '%s' ) );
-		if ( false === $inserted ) {
-			return new WP_Error( 'ggm_disease_save_failed', __( 'Could not create disease.', 'ggm-member-dashboard' ) );
-		}
-
-		return array(
-			'id'     => (int) $wpdb->insert_id,
-			'notice' => 'created',
-		);
+		return self::save( $_POST['disease_id'] ?? 0, $_POST['title'] ?? '', $_POST['description'] ?? '' );
 	}
 
 	private static function delete_diseases( array $ids ) {

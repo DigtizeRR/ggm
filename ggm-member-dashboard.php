@@ -3,7 +3,7 @@
  * Plugin Name: Digtize LMS System
  * Plugin URI:  https://digtize.com/
  * Description: Complete private member dashboard for Global Good Health Mission with OTP authentication and a fully standalone membership, coupon, and workshop system.
- * Version:     1.2.7
+ * Version:     1.3.8
  * Author:      Rakesh Raushan
  * Author URI:  https://digtize.com/
  * License:     GPL v2 or later
@@ -20,12 +20,13 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
-define( 'GGM_VERSION',       '1.2.7' );
+define( 'GGM_VERSION',       '1.3.8' );
 define( 'GGM_DB_VERSION',    '3.3.0' );
 define( 'GGM_PLUGIN_FILE',   __FILE__ );
 define( 'GGM_PLUGIN_DIR',    plugin_dir_path( __FILE__ ) );
 define( 'GGM_PLUGIN_URL',    plugin_dir_url( __FILE__ ) );
 define( 'GGM_PLUGIN_BASENAME', plugin_basename( __FILE__ ) );
+define( 'GGM_UPDATE_MANIFEST_URL', 'https://digtize.com/plugins/ggm/update.json' );
 
 // Fixed-code demo mode is accepted only when explicitly enabled in wp-config.php
 // and WordPress reports a local or development environment.
@@ -38,10 +39,12 @@ require_once GGM_PLUGIN_DIR . 'includes/class-ggm-loader.php';
 require_once GGM_PLUGIN_DIR . 'includes/class-ggm-activator.php';
 require_once GGM_PLUGIN_DIR . 'includes/class-ggm-deactivator.php';
 require_once GGM_PLUGIN_DIR . 'includes/class-ggm-helpers.php';
+require_once GGM_PLUGIN_DIR . 'includes/class-ggm-workshop-admin-config.php';
 require_once GGM_PLUGIN_DIR . 'includes/class-ggm-currency.php';
 require_once GGM_PLUGIN_DIR . 'includes/class-ggm-meta-boxes.php';
 require_once GGM_PLUGIN_DIR . 'includes/class-ggm-database.php';
 require_once GGM_PLUGIN_DIR . 'includes/class-ggm-cpt.php';
+require_once GGM_PLUGIN_DIR . 'includes/class-ggm-plugin-updater.php';
 
 // ─── Auth Modules ────────────────────────────────────────────────────────────
 // OTP delivery is intentionally email-only; legacy SMS/WhatsApp provider
@@ -55,6 +58,7 @@ require_once GGM_PLUGIN_DIR . 'modules/coupon/class-ggm-coupon.php';
 
 // ─── Payment Modules ─────────────────────────────────────────────────────────
 require_once GGM_PLUGIN_DIR . 'modules/payment/class-ggm-payment.php';
+require_once GGM_PLUGIN_DIR . 'modules/payment/class-ggm-payment-admin-service.php';
 require_once GGM_PLUGIN_DIR . 'modules/payment/class-ggm-credit.php';
 require_once GGM_PLUGIN_DIR . 'modules/payment/class-ggm-razorpay.php';
 require_once GGM_PLUGIN_DIR . 'modules/integration/class-ggm-ghl.php';
@@ -65,6 +69,8 @@ require_once GGM_PLUGIN_DIR . 'modules/integration/class-ggm-woocommerce-currenc
 require_once GGM_PLUGIN_DIR . 'modules/workshop/class-ggm-workshop.php';
 require_once GGM_PLUGIN_DIR . 'modules/workshop/class-ggm-workshop-slot.php';
 require_once GGM_PLUGIN_DIR . 'modules/workshop/class-ggm-lesson.php';
+require_once GGM_PLUGIN_DIR . 'modules/workshop/class-ggm-workshop-data-service.php';
+require_once GGM_PLUGIN_DIR . 'modules/course/class-ggm-course-data-service.php';
 require_once GGM_PLUGIN_DIR . 'modules/workshop/class-ggm-health-intake.php';
 require_once GGM_PLUGIN_DIR . 'modules/workshop/class-ggm-form-builder.php';
 require_once GGM_PLUGIN_DIR . 'modules/diseases/class-ggm-diseases.php';
@@ -76,6 +82,9 @@ require_once GGM_PLUGIN_DIR . 'modules/import-export/class-ggm-access-manager.ph
 
 // ─── Dashboard Module ────────────────────────────────────────────────────────
 require_once GGM_PLUGIN_DIR . 'modules/dashboard/class-ggm-dashboard.php';
+require_once GGM_PLUGIN_DIR . 'modules/dashboard/class-ggm-member-data-service.php';
+require_once GGM_PLUGIN_DIR . 'modules/dashboard/class-ggm-admin-overview-service.php';
+require_once GGM_PLUGIN_DIR . 'modules/dashboard/class-ggm-dashboard-management.php';
 
 // ─── Notification & REST API ─────────────────────────────────────────────────
 require_once GGM_PLUGIN_DIR . 'modules/notification/class-ggm-notification.php';
@@ -100,6 +109,8 @@ register_deactivation_hook( __FILE__, array( 'GGM_Deactivator', 'deactivate' ) )
  * @return void
  */
 function ggm_run() {
+	( new GGM_Plugin_Updater() )->init();
+
 	// Run DB schema upgrades if the stored version is behind the current one.
 	if ( get_option( 'ggm_db_version' ) !== GGM_DB_VERSION ) {
 		GGM_Database::create_tables();
@@ -115,6 +126,7 @@ function ggm_run() {
 
 	// Dashboard AJAX.
 	( new GGM_Dashboard() )->init( $loader );
+	( new GGM_Dashboard_Management() )->init( $loader );
 
 	// Course expiry, linked-course grants, and legacy enrollment import.
 	GGM_Access_Manager::init();
