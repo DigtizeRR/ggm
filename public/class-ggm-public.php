@@ -426,7 +426,7 @@ class GGM_Public {
 		wp_enqueue_style( 'dashicons' );
 		wp_enqueue_style( 'ggm-dashboard-css', GGM_PLUGIN_URL . 'assets/css/ggm-dashboard.css', array( 'dashicons' ), $dashboard_css_ver );
 		wp_enqueue_script( 'ggm-dashboard-js', GGM_PLUGIN_URL . 'assets/js/ggm-dashboard.js', array( 'jquery' ), $dashboard_js_ver, true );
-		if ( function_exists( 'ggm_dashboard_user_is_administrator' ) && ggm_dashboard_user_is_administrator() ) {
+		if ( function_exists( 'ggm_dashboard_user_can_use_admin_controls' ) && ggm_dashboard_user_can_use_admin_controls() ) {
 			wp_enqueue_media();
 			wp_enqueue_editor();
 			$management_js_path = GGM_PLUGIN_DIR . 'assets/js/ggm-dashboard-management.js';

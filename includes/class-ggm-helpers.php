@@ -453,6 +453,10 @@ function ggm_send_plugin_mail( $to, $subject, $message, $headers = array(), $att
 			// ── SMTP Transaction Summary ──────────────────────────
 			if ( $debug_active && ! empty( $GLOBALS['ggm_smtp_debug_log'] ) ) {
 				$summary = ggm_parse_smtp_transaction_log( $GLOBALS['ggm_smtp_debug_log'] );
+				// Keep a sanitized result for the owning send. Do not retain raw
+				// transcript content, which may contain sensitive mail data.
+				unset( $summary['transcript_sample'] );
+				$GLOBALS['ggm_last_smtp_transaction_summary'] = $summary;
 				$summary['level'] = ( 'SMTP server accepted message for delivery' === ( $summary['overall'] ?? '' ) ) ? 'success' : 'warning';
 				GGM_Meta_Boxes::log_error( 'SMTP Transaction Summary', $summary );
 			}
@@ -834,7 +838,14 @@ function ggm_send_email_otp( $email, $otp ) {
 	$body    = str_replace( '{otp}', $otp, $raw_body );
 	$html    = ggm_wrap_email_html( get_bloginfo( 'name' ), wp_kses_post( $body ) );
 	$headers = array( 'Content-Type: text/html; charset=UTF-8' );
+	// Capture only a redacted, structured SMTP stage summary for OTP sends.
+	$previous_debug = ! empty( $GLOBALS['ggm_smtp_debug_active'] );
+	unset( $GLOBALS['ggm_last_smtp_transaction_summary'] );
+	$GLOBALS['ggm_smtp_debug_active'] = true;
 	$sent    = ggm_send_plugin_mail( $email, $subject, $html, $headers );
+	$GLOBALS['ggm_smtp_debug_active'] = $previous_debug;
+	$smtp_transaction = isset( $GLOBALS['ggm_last_smtp_transaction_summary'] ) && is_array( $GLOBALS['ggm_last_smtp_transaction_summary'] ) ? $GLOBALS['ggm_last_smtp_transaction_summary'] : array();
+	unset( $GLOBALS['ggm_last_smtp_transaction_summary'] );
 
 	if ( class_exists( 'GGM_Meta_Boxes' ) ) {
 		global $phpmailer;
@@ -852,7 +863,11 @@ function ggm_send_email_otp( $email, $otp ) {
 		GGM_Meta_Boxes::log_error(
 			$sent ? 'OTP email: SMTP transport accepted message (wp_mail=true)' : 'OTP email: wp_mail returned false — delivery failed',
 			array(
-				'level'              => $sent ? 'success' : 'error',
+				// wp_mail() confirms only handoff to the configured SMTP server.
+				// It cannot confirm remote relay or recipient mailbox placement.
+				'level'              => $sent ? 'info' : 'error',
+				'stage'              => $sent ? 'smtp_submission' : 'provider_dispatch',
+				'delivery_status'    => $sent ? 'submitted_to_smtp' : 'submission_failed',
 				'intended_recipient' => ggm_mask_email_address( $email ),
 				'message_id'         => $message_id,
 				'smtp_host'          => $smtp['host'],
@@ -861,6 +876,12 @@ function ggm_send_email_otp( $email, $otp ) {
 				'mailer_type'        => $mailer_type,
 				'mailer_error'       => $mailer_error,
 				'wp_mail_result'     => $sent ? 'true' : 'false',
+				'trace_guidance'     => $sent ? 'Use the Message-ID with mail server logs to verify relay, bounce, or recipient-provider delivery.' : '',
+				'local_smtp_overall' => sanitize_text_field( (string) ( $smtp_transaction['overall'] ?? 'not captured' ) ),
+				'local_smtp_connect' => sanitize_text_field( (string) ( $smtp_transaction['connection'] ?? 'not captured' ) ),
+				'local_smtp_auth'    => sanitize_text_field( (string) ( $smtp_transaction['auth'] ?? 'not captured' ) ),
+				'local_smtp_rcpt'    => sanitize_text_field( (string) ( $smtp_transaction['rcpt_to'] ?? 'not captured' ) ),
+				'local_smtp_data'    => sanitize_text_field( (string) ( $smtp_transaction['data'] ?? 'not captured' ) ),
 			)
 		);
 	}

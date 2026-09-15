@@ -40,7 +40,7 @@ $avatar_img  = $custom_avatar ?: $gravatar_url;
 $custom_links_value = ggm_get_setting( 'ggm_dashboard_custom_links', '[]' );
 $custom_links       = is_array( $custom_links_value ) ? $custom_links_value : json_decode( $custom_links_value, true );
 $custom_links       = is_array( $custom_links ) ? $custom_links : array();
-$is_dashboard_administrator = function_exists( 'ggm_dashboard_user_is_administrator' ) && ggm_dashboard_user_is_administrator();
+$is_dashboard_administrator = function_exists( 'ggm_dashboard_user_can_use_admin_controls' ) && ggm_dashboard_user_can_use_admin_controls();
 ?>
 <div id="ggm-dash" class="ggm-dash-wrap">
 	<!-- Loader Spinner -->

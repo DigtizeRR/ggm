@@ -15,7 +15,7 @@ ggm_overview_expect( false !== strpos( $service, "status = %s" ) && false !== st
 ggm_overview_expect( false !== strpos( $service, "array( 'workshop', 'ggm_workshop' )" ), 'Workshop total does not cover both post types.' );
 ggm_overview_expect( false !== strpos( $service, "array( 'course' )" ), 'Course total is missing.' );
 ggm_overview_expect( false === strpos( $service, 'wp_ajax_' ), 'Overview must not register AJAX endpoints.' );
-ggm_overview_expect( false !== strpos( $template, 'ggm_dashboard_user_is_administrator' ), 'Overview template lacks the server-side Administrator guard.' );
+ggm_overview_expect( false !== strpos( $template, 'ggm_dashboard_user_can_use_admin_controls' ), 'Overview template lacks the server-side dashboard-controls guard.' );
 ggm_overview_expect( false !== strpos( $home, "templates/dashboard/admin/overview.php" ) && false !== strpos( $home, 'ggm-home-course' ), 'Overview is not rendered before replaceable Home content.' );
 ggm_overview_expect( false !== strpos( $css, 'overflow-y: auto;' ) && false !== strpos( $css, '.ggm-dash-nav' ), 'Desktop sidebar navigation is not scrollable.' );
 ggm_overview_expect( false !== strpos( $js, '.ggm-admin-overview-link[data-tab]' ), 'Overview management quick links do not use tab switching.' );

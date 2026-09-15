@@ -1,6 +1,6 @@
 <?php
 /** Protected Dashboard Home overview for administrators. */
-if ( ! defined( 'ABSPATH' ) || ! function_exists( 'ggm_dashboard_user_is_administrator' ) || ! ggm_dashboard_user_is_administrator() ) { return; }
+if ( ! defined( 'ABSPATH' ) || ! function_exists( 'ggm_dashboard_user_can_use_admin_controls' ) || ! ggm_dashboard_user_can_use_admin_controls() ) { return; }
 $overview = GGM_Admin_Overview_Service::get();
 if ( is_wp_error( $overview ) ) : ?>
 	<div class="ggm-admin-overview-error" role="status"><?php esc_html_e( 'Administrator overview is temporarily unavailable.', 'ggm-member-dashboard' ); ?></div>

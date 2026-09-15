@@ -30,6 +30,7 @@ class GGM_Admin {
 		// AJAX Settings saving.
 		$loader->add_action( 'wp_ajax_ggm_save_settings',              $this, 'ajax_save_settings' );
 		$loader->add_action( 'wp_ajax_ggm_clear_error_log',            $this, 'ajax_clear_error_log' );
+		$loader->add_action( 'wp_ajax_ggm_record_mail_delivery_outcome', $this, 'ajax_record_mail_delivery_outcome' );
 		$loader->add_action( 'wp_ajax_ggm_send_test_otp',              $this, 'ajax_send_test_otp' );
 		$loader->add_action( 'wp_ajax_ggm_send_smtp_test',             $this, 'ajax_send_smtp_test' );
 		$loader->add_action( 'wp_ajax_ggm_inline_create_lesson',       $this, 'ajax_inline_create_lesson' );
@@ -860,6 +861,7 @@ class GGM_Admin {
 		// Unchecked checkboxes are absent from an HTML submission. Preserve the
 		// explicit off state for Elementor's workshop video/image fallback.
 		$form_data['ggm_elementor_workshop_featured_media_fallback_enabled'] = isset( $_POST['settings']['ggm_elementor_workshop_featured_media_fallback_enabled'] ) ? '1' : '';
+		$form_data['ggm_dashboard_admin_controls_enabled'] = isset( $_POST['settings']['ggm_dashboard_admin_controls_enabled'] ) ? '1' : '';
 
 		update_option( 'ggm_settings', $form_data );
 		if ( $clear_currency_rates && class_exists( 'GGM_Currency' ) ) {
@@ -890,6 +892,41 @@ class GGM_Admin {
 	}
 
 	/**
+	 * AJAX: Attach a verified cPanel/provider delivery result to a Message-ID.
+	 * This is intentionally administrator-entered; WordPress cannot infer a
+	 * post-submission relay outcome from a local SMTP acceptance response.
+	 */
+	public function ajax_record_mail_delivery_outcome() {
+		check_ajax_referer( 'ggm_admin_nonce', 'nonce' );
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( array( 'message' => __( 'Access denied.', 'ggm-member-dashboard' ) ), 403 );
+		}
+
+		$message_id = sanitize_text_field( wp_unslash( $_POST['message_id'] ?? '' ) );
+		$message_id = trim( $message_id, "<> \t\r\n" );
+		$status     = sanitize_key( wp_unslash( $_POST['status'] ?? '' ) );
+		$host       = sanitize_text_field( wp_unslash( $_POST['remote_host'] ?? '' ) );
+		$reason     = sanitize_textarea_field( wp_unslash( $_POST['reason'] ?? '' ) );
+		$allowed    = array( 'delivered', 'deferred', 'bounced', 'rejected' );
+
+		if ( ! preg_match( '/^[^\s@<>]+@[^\s@<>]+$/', $message_id ) || ! in_array( $status, $allowed, true ) || '' === $reason ) {
+			wp_send_json_error( array( 'message' => __( 'Enter a valid Message-ID, status, and delivery result from cPanel or your mail provider.', 'ggm-member-dashboard' ) ), 400 );
+		}
+
+		GGM_Meta_Boxes::log_error( 'External mail delivery outcome recorded', array(
+			'level'           => in_array( $status, array( 'delivered' ), true ) ? 'success' : 'error',
+			'category'        => 'mail_delivery',
+			'delivery_status' => $status,
+			'message_id'      => '<' . $message_id . '>',
+			'outcome_source'  => 'administrator-recorded cPanel/provider result',
+			'remote_host'     => $host,
+			'remote_reason'   => function_exists( 'mb_substr' ) ? mb_substr( $reason, 0, 500 ) : substr( $reason, 0, 500 ),
+		) );
+
+		wp_send_json_success( array( 'message' => __( 'External delivery outcome recorded. Refresh the Error Log to view it.', 'ggm-member-dashboard' ) ) );
+	}
+
+	/**
 	 * AJAX: Send Test OTP.
 	 */
 	public function ajax_send_test_otp() {
@@ -915,7 +952,7 @@ class GGM_Admin {
 		$sent = ggm_send_email_otp( $target_email, $otp );
 
 		if ( $sent ) {
-			wp_send_json_success( array( 'message' => sprintf( __( 'Test OTP email sent to: %s', 'ggm-member-dashboard' ), $target_email ) ) );
+			wp_send_json_success( array( 'message' => sprintf( __( 'Test OTP email was submitted to the configured SMTP server for: %s. This does not confirm inbox delivery; check Inbox/Spam and use the Message-ID in the Error Log to trace the mail server outcome.', 'ggm-member-dashboard' ), $target_email ) ) );
 		} else {
 			wp_send_json_error( array( 'message' => __( 'Failed to dispatch test OTP. Check your email/SMTP configuration.', 'ggm-member-dashboard' ) ) );
 		}
@@ -964,7 +1001,7 @@ class GGM_Admin {
 		$GLOBALS['ggm_smtp_debug_active'] = false;
 
 		if ( $sent ) {
-			wp_send_json_success( array( 'message' => sprintf( __( 'Test email sent successfully to: %s', 'ggm-member-dashboard' ), $email ) ) );
+			wp_send_json_success( array( 'message' => sprintf( __( 'Test email was submitted to the configured SMTP server for: %s. This does not confirm inbox delivery; check Inbox/Spam and the mail server logs for the final outcome.', 'ggm-member-dashboard' ), $email ) ) );
 		} else {
 			global $phpmailer;
 			$error = isset( $phpmailer ) && ! empty( $phpmailer->ErrorInfo ) ? $phpmailer->ErrorInfo : __( 'Unknown error.', 'ggm-member-dashboard' );

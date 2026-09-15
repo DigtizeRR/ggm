@@ -88,7 +88,7 @@
 				currentOtpRequest = (res.data && res.data.request_id) ? res.data.request_id : '';
 				// Show masked destination in step 2.
 				var masked = (res.data && res.data.masked) ? res.data.masked : id;
-				$('#ggm-otp-sent-to').text('OTP sent to ' + masked);
+				$('#ggm-otp-sent-to').text('OTP email requested for ' + masked + '. Check your inbox and spam folder.');
 				// Clear any previous digits.
 				$('.ggm-otp-digit').val('');
 				$('.ggm-otp-digit').first().focus();
@@ -320,7 +320,7 @@
 				fpIdentifier = id;
 				fpOtpRequest = (res.data && res.data.request_id) ? res.data.request_id : '';
 				var masked = (res.data && res.data.masked) ? res.data.masked : id;
-				$('#ggm-fp-otp-sent-to').text('OTP sent to ' + masked);
+				$('#ggm-fp-otp-sent-to').text('OTP email requested for ' + masked + '. Check your inbox and spam folder.');
 				$('#ggm-fp-otp, #ggm-fp-new-password, #ggm-fp-confirm-password').val('');
 				$('#ggm-fp-request-stage').hide();
 				$('#ggm-fp-reset-stage').show();

@@ -1,4 +1,4 @@
-<?php if ( ! defined( 'ABSPATH' ) || ! function_exists( 'ggm_dashboard_user_is_administrator' ) || ! ggm_dashboard_user_is_administrator() ) return; ?>
+<?php if ( ! defined( 'ABSPATH' ) || ! function_exists( 'ggm_dashboard_user_can_use_admin_controls' ) || ! ggm_dashboard_user_can_use_admin_controls() ) return; ?>
 <div class="ggm-management-editor ggm-disease-editor" data-ggm-disease-editor>
 	<div class="ggm-management-head">
 		<button type="button" class="ggm-btn" data-ggm-disease-back><?php esc_html_e( 'Back to Diseases', 'ggm-member-dashboard' ); ?></button>

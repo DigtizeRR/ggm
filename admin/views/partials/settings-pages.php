@@ -26,6 +26,7 @@ $looks_swapped = $login_page_id && $dash_page_id
 $custom_links_json = $settings['ggm_dashboard_custom_links'] ?? '[]';
 $custom_links      = is_array( $custom_links_json ) ? $custom_links_json : json_decode( $custom_links_json, true );
 $custom_links      = is_array( $custom_links ) ? $custom_links : array();
+$dashboard_admin_controls_enabled = ! array_key_exists( 'ggm_dashboard_admin_controls_enabled', $settings ) || ! empty( $settings['ggm_dashboard_admin_controls_enabled'] );
 ?>
 <div class="ggm-settings-section-header">
 	<h3><?php esc_html_e( 'Page Routing Settings', 'ggm-member-dashboard' ); ?></h3>
@@ -101,6 +102,16 @@ $custom_links      = is_array( $custom_links ) ? $custom_links : array();
 			<p class="description">
 				<?php esc_html_e( 'Select the page where new visitors can create an account. The "Account not found" message on the login page links here.', 'ggm-member-dashboard' ); ?>
 			</p>
+		</td>
+	</tr>
+	<tr>
+		<th><?php esc_html_e( 'Dashboard Administrator Controls', 'ggm-member-dashboard' ); ?></th>
+		<td>
+			<label for="ggm-dashboard-admin-controls-enabled">
+				<input type="checkbox" name="settings[ggm_dashboard_admin_controls_enabled]" id="ggm-dashboard-admin-controls-enabled" value="1" <?php checked( $dashboard_admin_controls_enabled ); ?>>
+				<?php esc_html_e( 'Show administrator controls on member dashboard', 'ggm-member-dashboard' ); ?>
+			</label>
+			<p class="description"><?php esc_html_e( 'When off, /dashboard shows the normal member experience for administrators and dashboard management requests are denied. WordPress administrator access is unchanged.', 'ggm-member-dashboard' ); ?></p>
 		</td>
 	</tr>
 	<tr>

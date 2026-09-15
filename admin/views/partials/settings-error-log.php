@@ -36,6 +36,20 @@ $ggm_error_log = array_reverse( $ggm_error_log );
 
 	<div id="ggm-error-log-feedback" style="display:none; margin-bottom:12px; padding:8px 12px; border-radius:4px;"></div>
 
+	<details style="margin:0 0 16px; padding:12px; border:1px solid #dcdcde; border-radius:4px; background:#fff;">
+		<summary style="cursor:pointer; font-weight:600;"><?php esc_html_e( 'Record a cPanel or mail-provider delivery outcome', 'ggm-member-dashboard' ); ?></summary>
+		<p style="margin:10px 0; color:#50575e; font-size:13px;">
+			<?php esc_html_e( 'Use Track Delivery or a trusted provider result to attach the downstream outcome to the Message-ID. This records what happened after WordPress submitted the message to SMTP; it does not claim that inbox delivery was verified locally.', 'ggm-member-dashboard' ); ?>
+		</p>
+		<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(190px, 1fr)); gap:10px; align-items:end;">
+			<p style="margin:0;"><label for="ggm-mail-outcome-message-id"><strong><?php esc_html_e( 'Message-ID', 'ggm-member-dashboard' ); ?></strong></label><br><input class="regular-text" type="text" id="ggm-mail-outcome-message-id" placeholder="abc123@example.com" style="width:100%;"></p>
+			<p style="margin:0;"><label for="ggm-mail-outcome-status"><strong><?php esc_html_e( 'Outcome', 'ggm-member-dashboard' ); ?></strong></label><br><select id="ggm-mail-outcome-status" style="width:100%;"><option value="rejected"><?php esc_html_e( 'Rejected', 'ggm-member-dashboard' ); ?></option><option value="deferred"><?php esc_html_e( 'Deferred', 'ggm-member-dashboard' ); ?></option><option value="bounced"><?php esc_html_e( 'Bounced', 'ggm-member-dashboard' ); ?></option><option value="delivered"><?php esc_html_e( 'Delivered', 'ggm-member-dashboard' ); ?></option></select></p>
+			<p style="margin:0;"><label for="ggm-mail-outcome-host"><strong><?php esc_html_e( 'Remote host (optional)', 'ggm-member-dashboard' ); ?></strong></label><br><input class="regular-text" type="text" id="ggm-mail-outcome-host" placeholder="smtp.example.com" style="width:100%;"></p>
+		</div>
+		<p style="margin:10px 0 0;"><label for="ggm-mail-outcome-reason"><strong><?php esc_html_e( 'Provider result', 'ggm-member-dashboard' ); ?></strong></label><br><textarea id="ggm-mail-outcome-reason" rows="3" maxlength="500" style="width:100%;" placeholder="550 Your account has been locked. Please contact your administrator."></textarea></p>
+		<p style="margin:10px 0 0;"><button type="button" class="button button-secondary" id="ggm-record-mail-outcome-btn"><?php esc_html_e( 'Record delivery outcome', 'ggm-member-dashboard' ); ?></button> <span id="ggm-mail-outcome-feedback" style="font-size:13px;"></span></p>
+	</details>
+
 	<div id="ggm-error-log-wrap">
 		<?php if ( empty( $ggm_error_log ) ) : ?>
 			<p style="color:#888; font-size:13px; margin:0;"><?php esc_html_e( 'No errors logged yet.', 'ggm-member-dashboard' ); ?></p>
@@ -82,11 +96,14 @@ $ggm_error_log = array_reverse( $ggm_error_log );
 								<?php
 								$msg        = $entry['message'] ?? '';
 								$stage      = $context['stage'] ?? '';
-								$is_success = ( 'success' === $level || 'wp_mail_success' === $stage || false !== stripos( $msg, 'accepted' ) || ( false !== stripos( $msg, 'success' ) && false === stripos( $msg, 'error' ) && false === stripos( $msg, 'failed' ) ) );
+								$is_submission = ( 'submitted_to_smtp' === ( $context['delivery_status'] ?? '' ) );
+								$is_success = ( ! $is_submission && ( 'success' === $level || 'wp_mail_success' === $stage || false !== stripos( $msg, 'accepted' ) || ( false !== stripos( $msg, 'success' ) && false === stripos( $msg, 'error' ) && false === stripos( $msg, 'failed' ) ) ) );
 								$is_info    = ( ! $is_success && ( 'info' === $level || 'debug' === $level || in_array( $stage, array( 'workshop_otp_started', 'user_resolved', 'registered_email_resolved', 'smtp_configuration', 'smtp_dispatch_start' ), true ) || false !== stripos( $msg, 'pre-send' ) || false !== stripos( $msg, 'preparation' ) || false !== stripos( $msg, 'complete' ) || false !== stripos( $msg, 'fired' ) ) );
 								$is_warning = ( 'warning' === $level || false !== stripos( $msg, 'warning' ) );
 								?>
-								<?php if ( $is_success ) : ?>
+								<?php if ( $is_submission ) : ?>
+									<span style="background:#e0f2fe; color:#0369a1; padding:1px 6px; border-radius:8px; font-size:10px; font-weight:600; margin-right:6px;"><?php esc_html_e( 'SUBMITTED', 'ggm-member-dashboard' ); ?></span>
+								<?php elseif ( $is_success ) : ?>
 									<span style="background:#dcfce7; color:#15803d; padding:1px 6px; border-radius:8px; font-size:10px; font-weight:600; margin-right:6px;"><?php esc_html_e( 'SUCCESS', 'ggm-member-dashboard' ); ?></span>
 								<?php elseif ( 'email' === $category ) : ?>
 									<span style="background:#fef3c7; color:#92400e; padding:1px 6px; border-radius:8px; font-size:10px; font-weight:600; margin-right:6px;"><?php esc_html_e( 'EMAIL', 'ggm-member-dashboard' ); ?></span>
@@ -131,6 +148,45 @@ $ggm_error_log = array_reverse( $ggm_error_log );
 	var spinner  = document.getElementById( 'ggm-clear-error-log-spinner' );
 	var feedback = document.getElementById( 'ggm-error-log-feedback' );
 	var wrap     = document.getElementById( 'ggm-error-log-wrap' );
+	var outcomeButton = document.getElementById( 'ggm-record-mail-outcome-btn' );
+
+	if ( outcomeButton ) {
+		outcomeButton.addEventListener( 'click', function () {
+			var outcomeFeedback = document.getElementById( 'ggm-mail-outcome-feedback' );
+			var messageId = document.getElementById( 'ggm-mail-outcome-message-id' );
+			var status = document.getElementById( 'ggm-mail-outcome-status' );
+			var host = document.getElementById( 'ggm-mail-outcome-host' );
+			var reason = document.getElementById( 'ggm-mail-outcome-reason' );
+			var body = new URLSearchParams();
+
+			body.set( 'action', 'ggm_record_mail_delivery_outcome' );
+			body.set( 'nonce', '<?php echo esc_js( wp_create_nonce( 'ggm_admin_nonce' ) ); ?>' );
+			body.set( 'message_id', messageId ? messageId.value : '' );
+			body.set( 'status', status ? status.value : '' );
+			body.set( 'remote_host', host ? host.value : '' );
+			body.set( 'reason', reason ? reason.value : '' );
+			outcomeButton.disabled = true;
+
+			fetch( '<?php echo esc_url( admin_url( 'admin-ajax.php' ) ); ?>', {
+				method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: body.toString()
+			} )
+				.then( function ( res ) { return res.json(); } )
+				.then( function ( res ) {
+					outcomeButton.disabled = false;
+					if ( outcomeFeedback ) {
+						outcomeFeedback.style.color = res.success ? '#0e9e6e' : '#b91c1c';
+						outcomeFeedback.textContent = ( res.data && res.data.message ) || '<?php echo esc_js( __( 'Unable to record the delivery outcome.', 'ggm-member-dashboard' ) ); ?>';
+					}
+				} )
+				.catch( function () {
+					outcomeButton.disabled = false;
+					if ( outcomeFeedback ) {
+						outcomeFeedback.style.color = '#b91c1c';
+						outcomeFeedback.textContent = '<?php echo esc_js( __( 'Server error.', 'ggm-member-dashboard' ) ); ?>';
+					}
+				} );
+		} );
+	}
 
 	if ( ! btn ) {
 		return;

@@ -1,4 +1,4 @@
-<?php if ( ! defined( 'ABSPATH' ) || ! function_exists( 'ggm_dashboard_user_is_administrator' ) || ! ggm_dashboard_user_is_administrator() ) return; ?>
+<?php if ( ! defined( 'ABSPATH' ) || ! function_exists( 'ggm_dashboard_user_can_use_admin_controls' ) || ! ggm_dashboard_user_can_use_admin_controls() ) return; ?>
 <div class="ggm-management-panel ggm-diseases-panel" data-ggm-disease-manager>
 	<div class="ggm-management-head">
 		<h2><?php esc_html_e( 'Diseases', 'ggm-member-dashboard' ); ?></h2>

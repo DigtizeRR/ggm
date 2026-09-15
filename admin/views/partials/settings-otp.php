@@ -13,7 +13,7 @@ $smtp_ready = ggm_custom_smtp_enabled();
 ?>
 <div class="ggm-settings-section-header">
 	<h3><?php esc_html_e( 'Email OTP Settings', 'ggm-member-dashboard' ); ?></h3>
-	<p><?php esc_html_e( 'OTP codes are delivered only to the matched account\'s registered email through Custom SMTP. SMS, WhatsApp, and production demo-code delivery are disabled.', 'ggm-member-dashboard' ); ?></p>
+	<p><?php esc_html_e( 'OTP codes are submitted only to the matched account\'s registered email through Custom SMTP. SMTP submission does not by itself confirm inbox delivery. SMS, WhatsApp, and production demo-code delivery are disabled.', 'ggm-member-dashboard' ); ?></p>
 </div>
 
 <div style="background:<?php echo esc_attr( $smtp_ready ? '#ecfdf5' : '#fef2f2' ); ?>; border:1px solid <?php echo esc_attr( $smtp_ready ? '#10b981' : '#ef4444' ); ?>; border-radius:6px; padding:12px 16px; margin-bottom:20px;">
@@ -47,7 +47,7 @@ $smtp_ready = ggm_custom_smtp_enabled();
 				<span class="spinner" id="ggm-test-otp-spinner" style="float:none; margin-top:0;"></span>
 			</div>
 			<div id="ggm-test-otp-feedback" style="margin-top:8px; font-weight:600; font-size:13px;"></div>
-			<p class="description"><?php esc_html_e( 'Sends a real OTP through the saved Custom SMTP route.', 'ggm-member-dashboard' ); ?></p>
+			<p class="description"><?php esc_html_e( 'Submits a real OTP through the saved Custom SMTP route. Check Inbox and Spam, then use the Message-ID in Error Log to trace final delivery.', 'ggm-member-dashboard' ); ?></p>
 		</td>
 	</tr>
 </table>

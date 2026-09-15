@@ -108,7 +108,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 					<span class="spinner" id="ggm-smtp-test-spinner" style="float:none; margin-top:0;"></span>
 				</div>
 				<div id="ggm-smtp-test-feedback" style="margin-top:8px; font-weight:600; font-size:13px;"></div>
-				<p class="description"><?php esc_html_e( 'Sends a plain test email using the SMTP settings above. Save settings first.', 'ggm-member-dashboard' ); ?></p>
+				<p class="description"><?php esc_html_e( 'Submits a plain test email using the SMTP settings above. Save settings first; SMTP acceptance does not confirm recipient inbox delivery.', 'ggm-member-dashboard' ); ?></p>
 			</td>
 		</tr>
 	</table>
